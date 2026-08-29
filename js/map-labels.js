@@ -1,3 +1,5 @@
+import { APP_VERSION } from './version-ui.js';
+
 const MAP_W = 1040;
 const MAP_H = 620;
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -145,6 +147,8 @@ function escapeHtml(value = '') {
 function enhanceMap() {
   const svg = document.querySelector('#supMapSvg');
   if (!svg) return;
+  const version = document.querySelector('.brand .muted');
+  if (version && version.textContent !== `v${APP_VERSION}`) version.textContent = `v${APP_VERSION}`;
   ensureLabels(svg);
   const transform = parseWorldTransform(svg);
   updateLabels(svg, transform);

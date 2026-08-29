@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.5.2';
+export const APP_VERSION = '0.5.3';
 
 const versionText = `v${APP_VERSION}`;
 let scheduled = false;

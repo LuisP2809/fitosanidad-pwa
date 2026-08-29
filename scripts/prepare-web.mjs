@@ -15,6 +15,7 @@ const files = [
   'styles-supervision.css',
   'styles-mobile-fenologia.css',
   'styles-summary-mobile.css',
+  'styles-map-labels.css',
   'manifest.webmanifest',
   'sw.js',
   'js/app.js',
@@ -22,6 +23,7 @@ const files = [
   'js/sync.js',
   'js/qr.js',
   'js/supervision-safe.js',
+  'js/map-labels.js',
   'js/version-ui.js',
   'icons/icon.svg'
 ];
