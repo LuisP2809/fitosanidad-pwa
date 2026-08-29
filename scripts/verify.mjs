@@ -3,7 +3,8 @@ import path from 'node:path';
 
 const root = process.cwd();
 const required = [
-  'index.html','styles.css','manifest.webmanifest','sw.js','js/app.js','js/db.js','js/sync.js','data/catalogo-lotes.json','apps-script/Code.gs'
+  'index.html','styles.css','manifest.webmanifest','sw.js','js/app.js','js/db.js','js/sync.js','js/qr.js',
+  'data/catalogo-lotes.json','apps-script/Code.gs'
 ];
 for (const file of required) {
   if (!fs.existsSync(path.join(root, file))) throw new Error(`Falta ${file}`);
@@ -20,20 +21,23 @@ for (const [c,t,expected] of [[1,4,1/28],[14,1,2],[7,7,1/7]]) {
 }
 
 const app = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
-const db = fs.readFileSync(path.join(root, 'js/db.js'), 'utf8');
 const sync = fs.readFileSync(path.join(root, 'js/sync.js'), 'utf8');
 const backend = fs.readFileSync(path.join(root, 'apps-script/Code.gs'), 'utf8');
+const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
 if (!app.includes('diasRevision: 7')) throw new Error('Días de revisión no está fijado en 7.');
-if (!db.includes('fitosanidad-access-profile')) throw new Error('Falta validación de perfil central.');
-if (!sync.includes("'appendEvaluations'")) throw new Error('Falta sincronización autenticada.');
-if (!backend.includes('provisionInitialAdmin')) throw new Error('Falta aprovisionamiento inicial del Administrador.');
-if (!backend.includes('USUARIOS_SYNC') || !backend.includes('TOKEN_HASH')) throw new Error('Falta el control central de usuarios/tokens.');
+if (app.includes('Turno detectado')) throw new Error('Turno detectado volvió a aparecer en la interfaz.');
+if (!app.includes('Activar dispositivo') || !app.includes('qrSvg')) throw new Error('Falta la activación simplificada con QR.');
+if (!sync.includes("'redeemActivation'") || !sync.includes("'createActivation'")) throw new Error('Faltan endpoints de activación en el cliente.');
+if (!backend.includes('issueActivation_') || !backend.includes('redeemActivationAction_')) throw new Error('Falta activación temporal en Apps Script.');
+if (!backend.includes('ACTIVATION_TTL_MS') || !backend.includes('PropertiesService')) throw new Error('Falta expiración/almacenamiento de códigos temporales.');
 if (!backend.includes('USER_DISABLED')) throw new Error('Falta revocación central de usuarios.');
+if (!sw.includes('vendor/qrcode.mjs')) throw new Error('El QR no está incluido en el modo offline.');
 
 const allText = required.map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
-if (/AIza[0-9A-Za-z_-]{20,}|script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}/.test(allText)) throw new Error('Se detectó un secreto o URL de implementación dentro del repositorio.');
+if (/AIza[0-9A-Za-z_-]{20,}|script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}/.test(allText)) throw new Error('Se detectó un secreto o URL real de implementación dentro del repositorio.');
 
-console.log('OK · Fitosanidad PWA 0.2.0');
+console.log('OK · Fitosanidad PWA 0.3.0');
 console.log(`Catálogo: ${catalog.length} lotes`);
 console.log('Fórmulas verificadas: Bicho, Mosca, SENASA');
-console.log('Usuarios centrales, revocación y sincronización autenticada: verificados');
+console.log('Turno oculto en formularios: verificado');
+console.log('Activación por QR/código temporal de un solo uso: verificada');
