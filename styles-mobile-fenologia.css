@@ -1,0 +1,130 @@
+/* Ajuste móvil inspirado en las proporciones de Fenología. Solo presentación; no altera datos ni lógica. */
+@media (max-width:760px){
+  html{font-size:16px;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  body,#app,.app-shell{width:100%;max-width:none;min-width:0}
+  .app-shell{margin:0;padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+
+  /* Cabecera a ancho completo, con presencia similar a Fenología */
+  .topbar{width:100%;max-width:none;min-height:86px;padding:15px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:0}
+  .brand{gap:11px;min-width:0}
+  .brand-badge{width:48px;height:48px;border-radius:15px;font-size:20px;flex:0 0 48px}
+  .brand>div:last-child{font-size:17px;font-weight:850;letter-spacing:.035em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .top-actions{gap:8px;flex:0 0 auto}
+  .status-line{min-height:42px;padding:8px 11px;font-size:12px}
+  .topbar .btn.small{min-height:44px;padding:9px 12px;font-size:13px;border-radius:12px}
+
+  /* Contenido general más legible y respirado */
+  .page{padding:26px 16px 38px}
+  .hero{padding:22px;border-radius:22px;margin-bottom:20px}
+  .hero h1,.hero h2{font-size:30px;line-height:1.12}
+  .hero p{font-size:16px;line-height:1.55}
+  .card{padding:20px;border-radius:20px}
+  .section-title{margin:22px 0 14px}
+  .section-title h2,.section-title h3{font-size:25px;line-height:1.2}
+
+  .field{gap:9px}
+  .field label{font-size:15px;line-height:1.25}
+  .field input,.field select,input,select{min-height:56px;padding:14px 15px;border-radius:14px;font-size:16px}
+  .readonly{padding:14px 15px;border-radius:14px;font-size:16px}
+  .btn{min-height:50px;padding:13px 17px;border-radius:13px;font-size:15px}
+  .btn.small{min-height:44px;padding:10px 13px;font-size:14px}
+
+  .kpis{gap:12px}
+  .kpi{padding:17px;border-radius:19px}
+  .kpi span{font-size:13px}
+  .kpi strong{font-size:29px}
+
+  /* Barra inferior más cercana a la escala visual de Fenología */
+  .nav{left:0;transform:none;width:100%;max-width:none;min-height:74px;padding-bottom:env(safe-area-inset-bottom)}
+  .nav button{min-height:72px;padding:10px 4px 8px;font-size:12px;line-height:1.45;border-radius:0}
+  .nav button::first-line{font-size:22px;line-height:1.1}
+  .nav button.active{border-radius:16px 16px 0 0}
+}
+
+@media (max-width:420px){
+  .topbar{min-height:82px;padding:13px 14px}
+  .brand-badge{width:46px;height:46px;flex-basis:46px}
+  .brand>div:last-child{font-size:16px}
+  .status-line{font-size:0;min-width:43px;justify-content:center;padding-inline:9px}
+  .status-line::after{content:'Online';font-size:10px}
+  .status-line:has(.offline)::after{content:'Offline'}
+  .page{padding:24px 14px 36px}
+}
+
+/* Dashboard / mapa: proporciones móviles equivalentes a Fenología */
+@media (max-width:760px){
+  .sup-dashboard{gap:20px}
+  .sup-card{padding:22px 20px;border-radius:24px}
+  .sup-filters{padding:24px 20px}
+  .sup-filters .sup-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:14px;margin-bottom:24px}
+  .sup-filters .sup-head>div{min-width:0}
+  .sup-filters #supRefresh{width:auto;min-width:112px;align-self:start}
+  .sup-eyebrow{font-size:13px;letter-spacing:.14em;line-height:1.2}
+  .sup-head h2,.sup-chart-head h3{font-size:27px;line-height:1.16;margin:6px 0 8px}
+  .sup-head p{font-size:15px;line-height:1.55}
+
+  .sup-filter-grid{grid-template-columns:1fr;gap:17px}
+  .sup-filter-grid label{gap:9px;font-size:15px;line-height:1.25}
+  .sup-filter-grid input,.sup-filter-grid select{min-height:58px;padding:14px 15px;border-radius:15px;font-size:16px}
+  .sup-clear{width:100%;min-height:52px;font-size:15px;border-radius:14px}
+
+  .sup-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .sup-kpis article{padding:17px;border-radius:20px;min-height:112px;display:flex;flex-direction:column;justify-content:center}
+  .sup-kpis span{font-size:13px;line-height:1.25}
+  .sup-kpis strong{font-size:30px;line-height:1.1;margin:6px 0}
+  .sup-kpis small{font-size:11px;line-height:1.3}
+  .sup-kpis article:last-child{grid-column:1/-1;min-height:104px}
+
+  .sup-type-grid,.sup-chart-grid{grid-template-columns:1fr;gap:14px}
+  .sup-type-grid .sup-card{padding:22px 20px}
+  .sup-type-grid h3{font-size:22px;margin:10px 0 16px}
+  .sup-type-metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+  .sup-type-metrics div{padding:13px 10px;border-radius:14px}
+  .sup-type-metrics b{font-size:22px}
+  .sup-type-metrics small{font-size:11px;line-height:1.25}
+
+  .sup-chart{min-height:275px}
+  .sup-chart-head{gap:4px;margin-bottom:16px}
+  .sup-chart-head h3{font-size:22px}
+  .sup-chart-head span{font-size:12px;line-height:1.35}
+  .sup-bar-row{grid-template-columns:minmax(100px,1.2fr) minmax(80px,2fr) 48px;font-size:12px;gap:9px}
+  .sup-bar-row b{font-size:12px}
+  .sup-bar-track{height:12px}
+
+  /* Mapa: controles grandes, arrastre con dedo y panel alto como Fenología */
+  .sup-map-section{border-radius:24px}
+  .sup-map-section>.sup-head{padding:24px 20px 0;margin-bottom:18px}
+  .sup-map-layout{padding:0 20px 20px;gap:15px}
+  .sup-map-card{border-radius:18px}
+  .sup-map-toolbar{padding:13px 14px;gap:12px;align-items:flex-start;flex-direction:column}
+  .sup-map-legend{font-size:11px;gap:10px;line-height:1.35}
+  .sup-map-zoom{align-self:stretch;display:grid;grid-template-columns:52px minmax(110px,1fr) 52px;gap:8px}
+  .sup-map-zoom button{height:48px;width:100%;border-radius:12px;font-size:16px}
+  .sup-map-canvas,.sup-map-canvas svg{min-height:470px}
+  .sup-map-hint{padding:11px 14px;font-size:12px;line-height:1.4}
+  .sup-map-detail{padding:18px;border-radius:18px}
+  .sup-map-detail h3{font-size:27px;margin:6px 0 16px}
+  .sup-map-detail dl{gap:10px}
+  .sup-map-detail dl div{padding:12px;border-radius:12px}
+  .sup-map-detail dt{font-size:10px}
+  .sup-map-detail dd{font-size:14px}
+  .sup-map-detail p{font-size:13px;line-height:1.5}
+
+  .table-wrap{border-radius:18px}
+  th,td{padding:13px 14px;font-size:13px}
+}
+
+@media (max-width:420px){
+  .sup-card{padding:21px 18px}
+  .sup-filters{padding:23px 18px}
+  .sup-filters .sup-head{grid-template-columns:1fr;gap:12px}
+  .sup-filters #supRefresh{width:100%;min-height:50px}
+  .sup-head h2{font-size:26px}
+  .sup-head p{font-size:15px}
+  .sup-kpis{gap:10px}
+  .sup-kpis article{padding:15px;min-height:108px}
+  .sup-kpis strong{font-size:29px}
+  .sup-map-section>.sup-head{padding:22px 18px 0}
+  .sup-map-layout{padding:0 14px 18px}
+  .sup-map-canvas,.sup-map-canvas svg{min-height:440px}
+}
