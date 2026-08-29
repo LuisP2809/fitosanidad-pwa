@@ -8,22 +8,39 @@ export class CentralApiError extends Error {
   }
 }
 
-export async function centralRequest(user, action, payload = {}) {
-  if (!user?.syncEndpoint || !user?.deviceToken || !user?.id) throw new CentralApiError('NO_PROFILE', 'El usuario no tiene un perfil central configurado.');
-  if (!navigator.onLine) throw new CentralApiError('OFFLINE', 'No hay conexión a internet.');
+function validateEndpoint(endpoint) {
+  const value = String(endpoint || '').trim();
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(?:\?.*)?$/.test(value)) {
+    throw new CentralApiError('INVALID_ENDPOINT', 'La dirección del servidor no es válida.');
+  }
+  return value;
+}
 
-  const response = await fetch(user.syncEndpoint, {
+async function postJson(endpoint, body) {
+  if (!navigator.onLine) throw new CentralApiError('OFFLINE', 'No hay conexión a internet.');
+  const response = await fetch(validateEndpoint(endpoint), {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, userId: user.id, deviceToken: user.deviceToken, ...payload })
+    body: JSON.stringify(body)
   });
   if (!response.ok) throw new CentralApiError(`HTTP_${response.status}`, `HTTP ${response.status}`);
   const data = await response.json();
-  if (!data.ok) {
-    if (data.errorCode === 'USER_DISABLED') await markUserDisabled(user.id);
-    throw new CentralApiError(data.errorCode, data.error || 'La solicitud fue rechazada.');
-  }
+  if (!data.ok) throw new CentralApiError(data.errorCode, data.error || 'La solicitud fue rechazada.');
   return data;
+}
+
+export async function centralRequest(user, action, payload = {}) {
+  if (!user?.syncEndpoint || !user?.deviceToken || !user?.id) throw new CentralApiError('NO_PROFILE', 'El usuario no tiene un perfil central configurado.');
+  try {
+    return await postJson(user.syncEndpoint, { action, userId: user.id, deviceToken: user.deviceToken, ...payload });
+  } catch (error) {
+    if (error instanceof CentralApiError && error.code === 'USER_DISABLED') await markUserDisabled(user.id);
+    throw error;
+  }
+}
+
+export function redeemActivation(endpoint, activationCode) {
+  return postJson(endpoint, { action: 'redeemActivation', activationCode: String(activationCode || '').trim() });
 }
 
 export async function checkCentralAccess(user) {
@@ -51,6 +68,10 @@ export function listCentralUsers(user) {
 
 export function createCentralUser(user, input) {
   return centralRequest(user, 'createUser', { user: input });
+}
+
+export function createCentralActivation(user, targetUserId) {
+  return centralRequest(user, 'createActivation', { targetUserId });
 }
 
 export function setCentralUserActive(user, targetUserId, active) {
