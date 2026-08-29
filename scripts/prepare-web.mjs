@@ -21,6 +21,7 @@ const files = [
   'js/sync.js',
   'js/qr.js',
   'js/supervision-safe.js',
+  'js/version-ui.js',
   'icons/icon.svg'
 ];
 
