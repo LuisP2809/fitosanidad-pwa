@@ -1,7 +1,9 @@
 import { db } from './db.js';
 import { getCentralSnapshot } from './sync.js';
 
-const VERSION = '0.4.2';
+const VERSION = '0.5.0';
+const MAP_W = 1040;
+const MAP_H = 620;
 const TYPES = {
   all: { label: 'Todas las evaluaciones', indicator: '' },
   bicho: { label: 'Bicho del cesto', indicator: 'C/T/D' },
@@ -17,6 +19,10 @@ const state = {
   user: null,
   selectedLot: '',
   loading: false,
+  mapZoom: 1,
+  mapX: 0,
+  mapY: 0,
+  mapDrag: null,
   filters: { type: 'all', from: '', to: '', campo: '', fundo: '', modulo: '', evaluator: '' }
 };
 
@@ -237,12 +243,15 @@ function geometryParts(geometry) {
 function mapProjection(features) {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   features.forEach((f) => geometryParts(f.geometry).forEach((poly) => poly.forEach((ring) => ring.forEach(([x,y]) => {
-    if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
   }))));
   if (!Number.isFinite(minX)) return null;
-  const W=1040,H=620,P=24,dx=Math.max(0.000001,maxX-minX),dy=Math.max(0.000001,maxY-minY);
-  const scale=Math.min((W-2*P)/dx,(H-2*P)/dy),usedW=dx*scale,usedH=dy*scale,offX=(W-usedW)/2,offY=(H-usedH)/2;
-  return { W,H, project: ([lon,lat]) => [offX+(lon-minX)*scale, H-(offY+(lat-minY)*scale)] };
+  const P=24,dx=Math.max(0.000001,maxX-minX),dy=Math.max(0.000001,maxY-minY);
+  const scale=Math.min((MAP_W-2*P)/dx,(MAP_H-2*P)/dy),usedW=dx*scale,usedH=dy*scale,offX=(MAP_W-usedW)/2,offY=(MAP_H-usedH)/2;
+  return { W:MAP_W,H:MAP_H, project: ([lon,lat]) => [offX+(lon-minX)*scale, MAP_H-(offY+(lat-minY)*scale)] };
 }
 
 function pathFor(feature, projection) {
@@ -253,7 +262,7 @@ function pathFor(feature, projection) {
 }
 
 function colorFor(item, maxMetric) {
-  if (!item?.evaluations) return '#e5ece8';
+  if (!item?.evaluations) return '#c8d2cc';
   const metric = state.filters.type === 'all' ? item.captures : item.avgIndicator;
   const t = maxMetric > 0 ? Math.min(1, metric/maxMetric) : 0;
   return `hsl(148 46% ${(78-t*35).toFixed(1)}%)`;
@@ -275,15 +284,83 @@ function mapMarkup(rows) {
   const selectedFeature = features.find((f) => f.properties?.LOTE === state.selectedLot) || null;
   const selectedItem = selectedFeature ? byLot.get(selectedFeature.properties.LOTE) : null;
   const evaluated = features.filter((f) => byLot.has(f.properties?.LOTE)).length;
-  return `<section class="sup-card sup-map-section"><div class="sup-head"><div><span class="sup-eyebrow">MAPA FITOSANITARIO</span><h2>${features.length} lotes visibles · ${evaluated} evaluados</h2><p>La intensidad del verde es <strong>relativa a los datos filtrados</strong>; no representa un umbral fitosanitario.</p></div></div><div class="sup-map-layout"><div class="sup-map-canvas">${projection ? `<svg id="supMapSvg" viewBox="0 0 ${projection.W} ${projection.H}" role="img" aria-label="Mapa de lotes fitosanitarios">${features.map((f) => {
+  const paths = projection ? features.map((f) => {
     const lot=f.properties?.LOTE || '',item=byLot.get(lot);
     return `<path d="${pathFor(f,projection)}" fill="${colorFor(item,maxMetric)}" class="sup-lot ${state.selectedLot===lot?'selected':''}" data-sup-lot="${esc(lot)}"><title>${esc(lot)} · ${item?.evaluations || 0} evaluaciones · ${item?.captures || 0} capturas</title></path>`;
-  }).join('')}</svg>` : '<div class="sup-empty">No hay lotes para los filtros seleccionados.</div>'}<div class="sup-map-legend"><span><i class="none"></i>Sin evaluación</span><span><i class="low"></i>Menor intensidad relativa</span><span><i class="high"></i>Mayor intensidad relativa</span></div></div>${lotDetail(selectedFeature,selectedItem)}</div></section>`;
+  }).join('') : '';
+  return `<section class="sup-card sup-map-section">
+    <div class="sup-head"><div><span class="sup-eyebrow">MAPA FITOSANITARIO</span><h2>${features.length} lotes visibles · ${evaluated} evaluados</h2><p>La intensidad del verde es <strong>relativa a los datos filtrados</strong>; no representa un umbral fitosanitario.</p></div></div>
+    <div class="sup-map-layout">
+      <article class="sup-map-card">
+        <div class="sup-map-toolbar">
+          <div class="sup-map-legend"><span><i class="none"></i>Sin evaluación</span><span><i class="low"></i>Menor intensidad</span><span><i class="high"></i>Mayor intensidad</span></div>
+          <div class="sup-map-zoom"><button type="button" id="supMapOut" aria-label="Alejar mapa">−</button><button type="button" id="supMapFit">Ajustar</button><button type="button" id="supMapIn" aria-label="Acercar mapa">+</button></div>
+        </div>
+        <div class="sup-map-canvas">${projection ? `<svg id="supMapSvg" viewBox="0 0 ${projection.W} ${projection.H}" role="img" aria-label="Mapa de lotes fitosanitarios"><g id="supMapWorld">${paths}</g></svg>` : '<div class="sup-empty">No hay lotes para los filtros seleccionados.</div>'}</div>
+        <small class="sup-map-hint">Arrastra para mover el mapa. Usa − / Ajustar / + para cambiar la vista.</small>
+      </article>
+      ${lotDetail(selectedFeature,selectedItem)}
+    </div>
+  </section>`;
 }
 
 function latestTable(rows) {
   const latest=[...rows].sort((a,b)=>String(b.createdAt || b.fecha || '').localeCompare(String(a.createdAt || a.fecha || ''))).slice(0,12);
   return `<section class="sup-card"><div class="sup-head"><div><span class="sup-eyebrow">ÚLTIMOS REGISTROS</span><h2>Detalle operativo</h2></div></div>${latest.length ? `<div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Evaluación</th><th>Fundo</th><th>Lote</th><th>Capturas</th><th>Trampas</th><th>Indicador</th><th>Evaluador</th></tr></thead><tbody>${latest.map((r)=>`<tr><td>${datePE(r.fecha)}</td><td>${esc(TYPES[r.tipo]?.label || r.tipoNombre || r.tipo)}</td><td>${esc(r.fundo)}</td><td>${esc(r.lote)}</td><td>${fmt(r.capturas)}</td><td>${fmt(r.trampasRevisadas)}</td><td>${esc(r.indicadorNombre || TYPES[r.tipo]?.indicator || '')} ${fmt(r.indicador,3)}</td><td>${esc(r.evaluador || r.evaluadorId || '')}</td></tr>`).join('')}</tbody></table></div>` : '<div class="sup-empty">No hay registros para mostrar.</div>'}</section>`;
+}
+
+function applyMapTransform() {
+  const world=document.querySelector('#supMapWorld');
+  if (world) world.setAttribute('transform',`translate(${state.mapX} ${state.mapY}) scale(${state.mapZoom})`);
+}
+
+function zoomMap(nextZoom,cx=MAP_W/2,cy=MAP_H/2) {
+  const old=state.mapZoom;
+  const next=Math.min(12,Math.max(.75,nextZoom));
+  const factor=next/old;
+  state.mapX=cx-(cx-state.mapX)*factor;
+  state.mapY=cy-(cy-state.mapY)*factor;
+  state.mapZoom=next;
+  applyMapTransform();
+}
+
+function fitMap() {
+  state.mapZoom=1;
+  state.mapX=0;
+  state.mapY=0;
+  state.mapDrag=null;
+  applyMapTransform();
+}
+
+function bindMapGestures(svg) {
+  if (!svg || svg.dataset.bound === '1') return;
+  svg.dataset.bound='1';
+  svg.addEventListener('wheel',(event)=>{
+    event.preventDefault();
+    const rect=svg.getBoundingClientRect();
+    const x=(event.clientX-rect.left)/Math.max(1,rect.width)*MAP_W;
+    const y=(event.clientY-rect.top)/Math.max(1,rect.height)*MAP_H;
+    zoomMap(state.mapZoom*(event.deltaY<0?1.2:.84),x,y);
+  },{passive:false});
+  svg.addEventListener('pointerdown',(event)=>{
+    svg.setPointerCapture?.(event.pointerId);
+    state.mapDrag={id:event.pointerId,sx:event.clientX,sy:event.clientY,x:state.mapX,y:state.mapY,moved:false};
+  });
+  svg.addEventListener('pointermove',(event)=>{
+    if (!state.mapDrag || state.mapDrag.id !== event.pointerId) return;
+    const rect=svg.getBoundingClientRect();
+    const dx=(event.clientX-state.mapDrag.sx)/Math.max(1,rect.width)*MAP_W;
+    const dy=(event.clientY-state.mapDrag.sy)/Math.max(1,rect.height)*MAP_H;
+    state.mapDrag.moved=Math.abs(dx)+Math.abs(dy)>3;
+    state.mapX=state.mapDrag.x+dx;
+    state.mapY=state.mapDrag.y+dy;
+    applyMapTransform();
+  });
+  const end=(event)=>{
+    if (state.mapDrag?.id===event.pointerId) setTimeout(()=>{state.mapDrag=null;},0);
+  };
+  svg.addEventListener('pointerup',end);
+  svg.addEventListener('pointercancel',end);
 }
 
 function renderDashboard(page) {
@@ -297,17 +374,24 @@ function bindDashboard(page) {
   page.querySelector('#supType')?.addEventListener('change',(e)=>{state.filters.type=e.target.value;state.selectedLot='';rerender();});
   page.querySelector('#supFrom')?.addEventListener('change',(e)=>{state.filters.from=e.target.value;rerender();});
   page.querySelector('#supTo')?.addEventListener('change',(e)=>{state.filters.to=e.target.value;rerender();});
-  page.querySelector('#supCampo')?.addEventListener('change',(e)=>{state.filters.campo=e.target.value;state.filters.fundo='';state.filters.modulo='';state.selectedLot='';rerender();});
-  page.querySelector('#supFundo')?.addEventListener('change',(e)=>{state.filters.fundo=e.target.value;state.filters.modulo='';state.selectedLot='';rerender();});
-  page.querySelector('#supModulo')?.addEventListener('change',(e)=>{state.filters.modulo=e.target.value;state.selectedLot='';rerender();});
+  page.querySelector('#supCampo')?.addEventListener('change',(e)=>{state.filters.campo=e.target.value;state.filters.fundo='';state.filters.modulo='';state.selectedLot='';fitMap();rerender();});
+  page.querySelector('#supFundo')?.addEventListener('change',(e)=>{state.filters.fundo=e.target.value;state.filters.modulo='';state.selectedLot='';fitMap();rerender();});
+  page.querySelector('#supModulo')?.addEventListener('change',(e)=>{state.filters.modulo=e.target.value;state.selectedLot='';fitMap();rerender();});
   page.querySelector('#supEvaluator')?.addEventListener('change',(e)=>{state.filters.evaluator=e.target.value;rerender();});
-  page.querySelector('#supClear')?.addEventListener('click',()=>{state.filters={type:'all',from:'',to:'',campo:'',fundo:'',modulo:'',evaluator:''};state.selectedLot='';rerender();});
+  page.querySelector('#supClear')?.addEventListener('click',()=>{state.filters={type:'all',from:'',to:'',campo:'',fundo:'',modulo:'',evaluator:''};state.selectedLot='';fitMap();rerender();});
   page.querySelector('#supRefresh')?.addEventListener('click',async()=>{
     const btn=page.querySelector('#supRefresh');
     if (btn){btn.disabled=true;btn.textContent='Actualizando…';}
     try { await loadData(true); rerender(); } catch(error) { showError(page,error); }
   });
-  page.querySelector('#supMapSvg')?.addEventListener('click',(event)=>{
+  page.querySelector('#supMapIn')?.addEventListener('click',()=>zoomMap(state.mapZoom*1.35));
+  page.querySelector('#supMapOut')?.addEventListener('click',()=>zoomMap(state.mapZoom/1.35));
+  page.querySelector('#supMapFit')?.addEventListener('click',fitMap);
+  const svg=page.querySelector('#supMapSvg');
+  bindMapGestures(svg);
+  applyMapTransform();
+  svg?.addEventListener('click',(event)=>{
+    if (state.mapDrag?.moved) return;
     const path=event.target.closest?.('[data-sup-lot]');
     if (!path) return;
     state.selectedLot=path.dataset.supLot || '';
