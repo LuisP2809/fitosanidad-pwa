@@ -5,16 +5,32 @@ const root = process.cwd();
 const required = [
   'index.html','styles.css','styles-supervision.css','manifest.webmanifest','sw.js',
   'js/app.js','js/db.js','js/sync.js','js/qr.js','js/supervision.js',
-  'data/catalogo-lotes.json','apps-script/Code.gs','scripts/prepare-web.mjs'
+  'data/catalogo-fenologia.json','apps-script/Code.gs','scripts/prepare-web.mjs'
 ];
 for (const file of required) {
   if (!fs.existsSync(path.join(root, file))) throw new Error(`Falta ${file}`);
 }
 
-const catalog = JSON.parse(fs.readFileSync(path.join(root, 'data/catalogo-lotes.json'), 'utf8'));
-if (catalog.length !== 253) throw new Error(`Se esperaban 253 lotes y hay ${catalog.length}.`);
-if (!catalog.every((x) => ['OLMOS','MOTUPE'].includes(x.campo) && x.fundo && x.modulo && x.lote)) throw new Error('Hay filas inválidas en el catálogo.');
-if (!catalog.every((x) => /^M\d{2}T\d{2}-/.test(x.lote))) throw new Error('Hay lotes con estructura no esperada.');
+const master = JSON.parse(fs.readFileSync(path.join(root, 'data/catalogo-fenologia.json'), 'utf8'));
+const catalog = [];
+const seen = new Set();
+for (const [campo, fundos] of Object.entries(master?.lotesAgrupados || {})) {
+  for (const [fundo, modulos] of Object.entries(fundos || {})) {
+    for (const [modulo, lotes] of Object.entries(modulos || {})) {
+      for (const rawLot of lotes || []) {
+        const lote = String(rawLot || '').trim();
+        if (!lote || seen.has(lote)) throw new Error(`Lote maestro inválido o duplicado: ${lote || '(vacío)'}.`);
+        seen.add(lote);
+        catalog.push({ campo, fundo, modulo, lote });
+      }
+    }
+  }
+}
+if (catalog.length !== 254) throw new Error(`Se esperaban 254 lotes del catálogo maestro de Fenología y hay ${catalog.length}.`);
+if (!catalog.every((x) => ['OLMOS','MOTUPE'].includes(x.campo) && x.fundo && x.modulo && x.lote)) throw new Error('Hay filas inválidas en el catálogo maestro.');
+if (!catalog.some((x) => x.lote === 'CACAO' && x.campo === 'MOTUPE' && x.fundo === 'CHOLOQUE' && x.modulo === 'M02')) throw new Error('Falta el lote especial CACAO.');
+if (!catalog.some((x) => x.lote === 'M06T02-05') || !catalog.some((x) => x.lote === 'M06T02-06')) throw new Error('Faltan M06T02-05/M06T02-06 del catálogo correcto de Fenología.');
+if (catalog.some((x) => ['M06T01-05','M06T01-06'].includes(x.lote))) throw new Error('Persisten códigos antiguos que no pertenecen al catálogo maestro de Fenología.');
 
 const calc = (captures, traps) => captures / (traps * 7);
 for (const [c,t,expected] of [[1,4,1/28],[14,1,2],[7,7,1/7]]) {
@@ -36,14 +52,14 @@ if (!backend.includes('USER_DISABLED')) throw new Error('Falta revocación centr
 if (!sw.includes('vendor/qrcode.mjs') || !sw.includes('data/lotes-mapa.geojson') || !sw.includes('js/supervision.js')) throw new Error('El mapa/dashboard no quedó incluido en la caché PWA.');
 if (!supervision.includes('Mapa y dashboard fitosanitario') || !supervision.includes('getCentralSnapshot')) throw new Error('Falta el dashboard central.');
 if (!supervision.includes('no representa un umbral fitosanitario')) throw new Error('Falta aclaración de escala relativa del mapa.');
-if (!prepare.includes('fenologia-pwa') || !prepare.includes('EXPECTED_MISSING_GEOMETRY') || !prepare.includes('M06T01-05') || !prepare.includes('M06T01-06')) throw new Error('Falta construir y controlar la cobertura conocida del GeoJSON fitosanitario.');
+if (!prepare.includes('catalogo-fenologia.json') || !prepare.includes('catalog.length !== 254') || !prepare.includes('fenologia-pwa')) throw new Error('Falta construir el catálogo/mapa fitosanitario desde la referencia de Fenología.');
 
 const allText = required.map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
 if (/AIza[0-9A-Za-z_-]{20,}|script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}/.test(allText)) throw new Error('Se detectó un secreto o URL real de implementación dentro del repositorio.');
 
-console.log('OK · Fitosanidad PWA 0.4.0');
-console.log(`Catálogo: ${catalog.length} lotes`);
+console.log('OK · Fitosanidad PWA 0.4.1');
+console.log(`Catálogo maestro de Fenología: ${catalog.length} lotes`);
 console.log('Fórmulas verificadas: Bicho, Mosca, SENASA');
 console.log('Activación simplificada: verificada');
 console.log('Dashboard central y mapa fitosanitario: verificados');
-console.log('Cobertura cartográfica conocida: 251/253; sin geometría M06T01-05 y M06T01-06');
+console.log('Catálogo corregido: M06T02-05/M06T02-06 y CACAO incluidos');
