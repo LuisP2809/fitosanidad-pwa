@@ -1,0 +1,125 @@
+/* Etiquetas de lotes y detalle rápido del mapa fitosanitario. */
+.sup-lot-label{
+  fill:#173d2b;
+  stroke:rgba(255,255,255,.96);
+  stroke-width:4px;
+  paint-order:stroke fill;
+  font-size:18px;
+  font-weight:900;
+  letter-spacing:.01em;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .16s ease,fill .16s ease;
+}
+#supMapSvg[data-lot-labels="show"] .sup-lot-label{opacity:.9}
+#supMapSvg .sup-lot-label.selected-label{
+  opacity:1;
+  fill:#714a00;
+  stroke:#fff6df;
+  stroke-width:5px;
+  font-size:21px;
+}
+
+.sup-map-popup{
+  position:absolute;
+  z-index:8;
+  width:min(255px,calc(100% - 24px));
+  transform:translate(-50%,calc(-100% - 14px));
+  background:rgba(255,255,255,.98);
+  border:1px solid #cfe0d4;
+  border-radius:16px;
+  padding:13px 14px 12px;
+  color:var(--g950);
+  box-shadow:0 14px 34px rgba(6,59,37,.22);
+  pointer-events:auto;
+  backdrop-filter:blur(8px);
+}
+.sup-map-popup::after{
+  content:'';
+  position:absolute;
+  left:50%;
+  bottom:-8px;
+  width:14px;
+  height:14px;
+  transform:translateX(-50%) rotate(45deg);
+  background:#fff;
+  border-right:1px solid #cfe0d4;
+  border-bottom:1px solid #cfe0d4;
+}
+.sup-map-popup>span{
+  display:block;
+  color:var(--g700);
+  font-size:9px;
+  font-weight:950;
+  letter-spacing:.14em;
+}
+.sup-map-popup>strong{
+  display:block;
+  margin:2px 28px 1px 0;
+  font-size:20px;
+  line-height:1.15;
+  color:var(--g950);
+}
+.sup-map-popup>small{
+  display:block;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.35;
+}
+.sup-map-popup-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:6px;
+  margin-top:10px;
+}
+.sup-map-popup-grid div{
+  min-width:0;
+  padding:7px 5px;
+  border:1px solid #e2ece5;
+  border-radius:10px;
+  background:var(--g050);
+  text-align:center;
+}
+.sup-map-popup-grid b,.sup-map-popup-grid em{display:block}
+.sup-map-popup-grid b{font-size:15px;color:var(--g900)}
+.sup-map-popup-grid em{margin-top:2px;font-size:8px;font-style:normal;color:var(--muted)}
+.sup-map-popup p{
+  margin:9px 0 0;
+  padding-top:8px;
+  border-top:1px solid #edf2ef;
+  font-size:11px;
+  font-weight:850;
+  color:var(--g900);
+}
+.sup-map-popup-close{
+  position:absolute;
+  top:7px;
+  right:7px;
+  width:28px;
+  height:28px;
+  display:grid;
+  place-items:center;
+  border:0;
+  border-radius:50%;
+  background:#edf4ef;
+  color:var(--g900);
+  font-size:18px;
+  font-weight:900;
+  line-height:1;
+  cursor:pointer;
+}
+
+@media(max-width:760px){
+  .sup-lot-label{font-size:24px;stroke-width:5px}
+  #supMapSvg .sup-lot-label.selected-label{font-size:28px;stroke-width:6px}
+  .sup-map-popup{width:min(245px,calc(100% - 22px));padding:12px 13px 11px;border-radius:15px}
+  .sup-map-popup>strong{font-size:19px}
+  .sup-map-popup>small{font-size:10px}
+  .sup-map-popup-grid b{font-size:14px}
+}
+
+@media(max-width:420px){
+  .sup-map-popup{width:min(230px,calc(100% - 20px));transform:translate(-50%,calc(-100% - 11px))}
+  .sup-map-popup-grid{gap:5px}
+  .sup-map-popup-grid div{padding:6px 4px}
+}
