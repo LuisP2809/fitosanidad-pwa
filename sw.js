@@ -1,9 +1,10 @@
-const VERSION = 'fitosanidad-0.5.0';
+const VERSION = 'fitosanidad-0.5.1';
 const CORE = [
   './',
   './index.html',
   './styles.css',
   './styles-supervision.css',
+  './styles-mobile-fenologia.css',
   './manifest.webmanifest',
   './icons/icon.svg',
   './js/app.js',
