@@ -36,7 +36,7 @@ if (!backend.includes('USER_DISABLED')) throw new Error('Falta revocación centr
 if (!sw.includes('vendor/qrcode.mjs') || !sw.includes('data/lotes-mapa.geojson') || !sw.includes('js/supervision.js')) throw new Error('El mapa/dashboard no quedó incluido en la caché PWA.');
 if (!supervision.includes('Mapa y dashboard fitosanitario') || !supervision.includes('getCentralSnapshot')) throw new Error('Falta el dashboard central.');
 if (!supervision.includes('no representa un umbral fitosanitario')) throw new Error('Falta aclaración de escala relativa del mapa.');
-if (!prepare.includes('fenologia-pwa') || !prepare.includes('features.length !== catalog.length')) throw new Error('Falta construir/validar el GeoJSON fitosanitario.');
+if (!prepare.includes('fenologia-pwa') || !prepare.includes('EXPECTED_MISSING_GEOMETRY') || !prepare.includes('M06T01-05') || !prepare.includes('M06T01-06')) throw new Error('Falta construir y controlar la cobertura conocida del GeoJSON fitosanitario.');
 
 const allText = required.map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
 if (/AIza[0-9A-Za-z_-]{20,}|script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}/.test(allText)) throw new Error('Se detectó un secreto o URL real de implementación dentro del repositorio.');
@@ -46,3 +46,4 @@ console.log(`Catálogo: ${catalog.length} lotes`);
 console.log('Fórmulas verificadas: Bicho, Mosca, SENASA');
 console.log('Activación simplificada: verificada');
 console.log('Dashboard central y mapa fitosanitario: verificados');
+console.log('Cobertura cartográfica conocida: 251/253; sin geometría M06T01-05 y M06T01-06');
