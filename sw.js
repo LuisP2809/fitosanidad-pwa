@@ -1,16 +1,19 @@
-const VERSION = 'fitosanidad-0.3.0';
+const VERSION = 'fitosanidad-0.4.0';
 const CORE = [
   './',
   './index.html',
   './styles.css',
+  './styles-supervision.css',
   './manifest.webmanifest',
   './icons/icon.svg',
   './js/app.js',
   './js/db.js',
   './js/sync.js',
   './js/qr.js',
+  './js/supervision.js',
   './vendor/qrcode.mjs',
-  './data/catalogo-lotes.json'
+  './data/catalogo-lotes.json',
+  './data/lotes-mapa.geojson'
 ];
 
 self.addEventListener('install', (event) => {
