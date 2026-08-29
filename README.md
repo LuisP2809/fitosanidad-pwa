@@ -32,10 +32,15 @@ PWA móvil *offline-first* para registrar y supervisar evaluaciones fitosanitari
 
 Consulta `apps-script/README.md` para instalación y actualización.
 
+## Publicación web
+
+El workflow `.github/workflows/deploy-pages.yml` valida la aplicación, genera una carpeta pública `www/` con solo los archivos necesarios de la PWA y la publica mediante GitHub Pages. El código de Apps Script y los archivos de desarrollo no forman parte del artefacto web.
+
 ## Validación
 
 ```bash
 npm test
+npm run build:web
 ```
 
 No se guardan IDs de Drive, URL de implementación ni tokens reales dentro del repositorio.
