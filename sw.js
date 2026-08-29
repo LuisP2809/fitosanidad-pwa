@@ -1,4 +1,4 @@
-const VERSION = 'fitosanidad-0.2.0-r1';
+const VERSION = 'fitosanidad-0.3.0';
 const CORE = [
   './',
   './index.html',
@@ -8,6 +8,8 @@ const CORE = [
   './js/app.js',
   './js/db.js',
   './js/sync.js',
+  './js/qr.js',
+  './vendor/qrcode.mjs',
   './data/catalogo-lotes.json'
 ];
 
