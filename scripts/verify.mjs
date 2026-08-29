@@ -4,7 +4,7 @@ import path from 'node:path';
 const root = process.cwd();
 const required = [
   'index.html','styles.css','styles-supervision.css','manifest.webmanifest','sw.js',
-  'js/app.js','js/db.js','js/sync.js','js/qr.js','js/supervision.js',
+  'js/app.js','js/db.js','js/sync.js','js/qr.js','js/supervision-safe.js',
   'data/catalogo-fenologia.json','apps-script/Code.gs','scripts/prepare-web.mjs'
 ];
 for (const file of required) {
@@ -41,25 +41,30 @@ const app = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
 const sync = fs.readFileSync(path.join(root, 'js/sync.js'), 'utf8');
 const backend = fs.readFileSync(path.join(root, 'apps-script/Code.gs'), 'utf8');
 const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-const supervision = fs.readFileSync(path.join(root, 'js/supervision.js'), 'utf8');
+const supervision = fs.readFileSync(path.join(root, 'js/supervision-safe.js'), 'utf8');
 const prepare = fs.readFileSync(path.join(root, 'scripts/prepare-web.mjs'), 'utf8');
+const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 if (!app.includes('diasRevision: 7')) throw new Error('Días de revisión no está fijado en 7.');
 if (app.includes('Turno detectado')) throw new Error('Turno detectado volvió a aparecer en la interfaz.');
 if (!app.includes('Activar dispositivo') || !app.includes('qrSvg')) throw new Error('Falta la activación simplificada con QR.');
 if (!sync.includes("'redeemActivation'") || !sync.includes("'createActivation'")) throw new Error('Faltan endpoints de activación en el cliente.');
 if (!backend.includes('issueActivation_') || !backend.includes('redeemActivationAction_')) throw new Error('Falta activación temporal en Apps Script.');
 if (!backend.includes('USER_DISABLED')) throw new Error('Falta revocación central de usuarios.');
-if (!sw.includes('vendor/qrcode.mjs') || !sw.includes('data/lotes-mapa.geojson') || !sw.includes('js/supervision.js')) throw new Error('El mapa/dashboard no quedó incluido en la caché PWA.');
+if (!sw.includes('vendor/qrcode.mjs') || !sw.includes('data/lotes-mapa.geojson') || !sw.includes('js/supervision-safe.js')) throw new Error('El mapa/dashboard seguro no quedó incluido en la caché PWA.');
+if (!index.includes('js/supervision-safe.js') || index.includes('src="js/supervision.js')) throw new Error('La página sigue cargando el observador antiguo.');
 if (!supervision.includes('Mapa y dashboard fitosanitario') || !supervision.includes('getCentralSnapshot')) throw new Error('Falta el dashboard central.');
 if (!supervision.includes('no representa un umbral fitosanitario')) throw new Error('Falta aclaración de escala relativa del mapa.');
+if (!supervision.includes("observer.observe(root,{childList:true})")) throw new Error('El observador seguro debe limitarse a cambios directos del contenedor principal.');
+if (supervision.includes('subtree:true') || supervision.includes('subtree: true')) throw new Error('El observador recursivo puede volver a bloquear la PWA.');
+if (!supervision.includes('requestAnimationFrame')) throw new Error('Falta limitar la detección de cambios por cuadro.');
 if (!prepare.includes('catalogo-fenologia.json') || !prepare.includes('catalog.length !== 254') || !prepare.includes('fenologia-pwa')) throw new Error('Falta construir el catálogo/mapa fitosanitario desde la referencia de Fenología.');
 
 const allText = required.map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
 if (/AIza[0-9A-Za-z_-]{20,}|script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}/.test(allText)) throw new Error('Se detectó un secreto o URL real de implementación dentro del repositorio.');
 
-console.log('OK · Fitosanidad PWA 0.4.1');
+console.log('OK · Fitosanidad PWA 0.4.2');
 console.log(`Catálogo maestro de Fenología: ${catalog.length} lotes`);
 console.log('Fórmulas verificadas: Bicho, Mosca, SENASA');
 console.log('Activación simplificada: verificada');
 console.log('Dashboard central y mapa fitosanitario: verificados');
-console.log('Catálogo corregido: M06T02-05/M06T02-06 y CACAO incluidos');
+console.log('Rendimiento: observador recursivo retirado y detección limitada por cuadro');
