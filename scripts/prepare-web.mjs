@@ -5,6 +5,7 @@ const root = process.cwd();
 const out = path.join(root, 'www');
 const MAP_REF = '644433f3e756aa0ca5cbbd2ef0fc950837821521';
 const MAP_URL = `https://raw.githubusercontent.com/LuisP2809/fenologia-pwa/${MAP_REF}/data/lotes-mapa.geojson`;
+const EXPECTED_MISSING_GEOMETRY = new Set(['M06T01-05', 'M06T01-06']);
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
@@ -63,18 +64,30 @@ const features = sourceMap.features.filter((feature) => {
 });
 
 const missing = [...catalogByLot.keys()].filter((lot) => !seen.has(lot));
-if (missing.length || features.length !== catalog.length) throw new Error(`Mapa incompleto. Faltan: ${missing.slice(0,10).join(', ') || 'desconocido'}.`);
+const unexpectedMissing = missing.filter((lot) => !EXPECTED_MISSING_GEOMETRY.has(lot));
+const expectedNotMissing = [...EXPECTED_MISSING_GEOMETRY].filter((lot) => !missing.includes(lot));
+if (unexpectedMissing.length || expectedNotMissing.length || features.length !== catalog.length - EXPECTED_MISSING_GEOMETRY.size) {
+  throw new Error(`Cobertura cartográfica inesperada. Faltan: ${missing.join(', ') || 'ninguno'}.`);
+}
 
 const mapTarget = path.join(out, 'data', 'lotes-mapa.geojson');
 const cleanMap = {
   ...sourceMap,
   source: `fenologia-pwa@${MAP_REF}`,
-  stats: { ...(sourceMap.stats || {}), lotesActivos: features.length, zonasReferencia: 0, featuresNormalizadas: features.length },
+  stats: {
+    ...(sourceMap.stats || {}),
+    totalCatalogo: catalog.length,
+    lotesActivos: features.length,
+    lotesSinGeometria: missing,
+    zonasReferencia: 0,
+    featuresNormalizadas: features.length
+  },
   features
 };
 fs.writeFileSync(mapTarget, JSON.stringify(cleanMap));
 
 fs.writeFileSync(path.join(out, '.nojekyll'), '');
 console.log(`Sitio preparado en ${out}`);
-console.log(`Mapa fitosanitario: ${features.length} lotes validados`);
+console.log(`Mapa fitosanitario: ${features.length}/${catalog.length} lotes con geometría validada`);
+console.log(`Sin geometría conocida: ${missing.join(', ')}`);
 console.log(`Archivos públicos: ${files.length + 3}`);
