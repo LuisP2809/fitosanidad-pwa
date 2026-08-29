@@ -1,4 +1,4 @@
-const VERSION = 'fitosanidad-0.2.0';
+const VERSION = 'fitosanidad-0.2.0-r1';
 const CORE = [
   './',
   './index.html',
