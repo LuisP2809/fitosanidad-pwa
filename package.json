@@ -1,9 +1,9 @@
 {
   "name": "fitosanidad-pwa",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
-  "description": "Evaluaciones fitosanitarias offline con sincronización central para campo.",
+  "description": "Evaluaciones fitosanitarias offline con sincronización central, dashboard y mapa por lote.",
   "scripts": {
     "test": "node scripts/verify.mjs",
     "build:web": "node scripts/prepare-web.mjs"
