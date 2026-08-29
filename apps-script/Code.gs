@@ -1,12 +1,14 @@
-/* Fitosanidad PWA 0.2.0 · servicio central Google Sheets.
- * Instalar como proyecto independiente de Google Apps Script.
+/* Fitosanidad PWA 0.3.0 · servicio central Google Sheets.
+ * Activación simplificada por enlace/QR + código temporal de un solo uso.
  * No contiene tokens, IDs de Drive ni datos reales.
  */
 
-const FITO_VERSION = '0.2.0';
+const FITO_VERSION = '0.3.0';
 const SPREADSHEET_ID_PROPERTY = 'FITO_SPREADSHEET_ID';
 const MAX_BATCH_SIZE = 200;
 const MAX_SNAPSHOT_RECORDS = 5000;
+const ACTIVATION_TTL_MS = 24 * 60 * 60 * 1000;
+const ACTIVATION_PREFIX = 'FITO_ACTIVATION_';
 
 const SHEET_NAMES = {
   bicho: 'BICHO DEL CESTO',
@@ -16,7 +18,7 @@ const SHEET_NAMES = {
 
 const HEADERS = {
   bicho: ['AÑO','MES','SEMANA','FECHA','LUGAR','FUNDO','MODULO','LOTE','CAPTURAS','TRAMPAS REVISADAS','DIAS DE REVISION','C/T/D'],
-  mosca: ['AÑO','MES','SEMANA','FECHA','LUGAR','FUNDO','MÓDULO','LOTE','MOSCAS CAPTURADAS','TRAMPAS REVISADAS','DIAS DE REVISION','MTD'],
+  mosca: ['AÑO','MES','Semana','FECHA','LUGAR','FUNDO','MÓDULO','LOTE','MOSCAS CAPTURADAS','TRAMPAS REVISADAS','DIAS DE REVISION','MTD'],
   senasa: ['AÑO','MES','SEMANA','FECHA','LUGAR','FUNDO','MODULO','LOTE','CAPTURAS','TRAMPAS REVISADAS','DIAS DE REVISION','C/T/D']
 };
 
@@ -43,6 +45,7 @@ function setupFitosanidad() {
   const defaultSheet = ss.getSheetByName('Sheet1') || ss.getSheetByName('Hoja 1');
   if (defaultSheet && ss.getSheets().length > 1) ss.deleteSheet(defaultSheet);
 
+  cleanupExpiredActivations_();
   return { version: FITO_VERSION, spreadsheetId: ss.getId(), spreadsheetUrl: ss.getUrl() };
 }
 
@@ -73,18 +76,23 @@ function doPost(e) {
     setupFitosanidad();
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = clean_(body.action);
-    const allowed = ['ping','appendEvaluations','listUsers','createUser','setUserActive','rotateUserToken','snapshot'];
+    const allowed = [
+      'ping','appendEvaluations','listUsers','createUser','setUserActive','rotateUserToken','snapshot',
+      'createActivation','redeemActivation'
+    ];
     if (allowed.indexOf(action) < 0) throw apiError_('ACTION_NOT_ALLOWED', 'Acción no soportada.');
 
     const lock = LockService.getScriptLock();
     lock.waitLock(30000);
     try {
+      if (action === 'redeemActivation') return json_(redeemActivationAction_(body));
       if (action === 'ping') return json_(ping_(body));
       if (action === 'appendEvaluations') return json_(appendEvaluationsAction_(body));
       if (action === 'listUsers') return json_(listUsersAction_(body));
       if (action === 'createUser') return json_(createUserAction_(body));
       if (action === 'setUserActive') return json_(setUserActiveAction_(body));
       if (action === 'rotateUserToken') return json_(rotateUserTokenAction_(body));
+      if (action === 'createActivation') return json_(createActivationAction_(body));
       if (action === 'snapshot') return json_(snapshotAction_(body));
       throw apiError_('ACTION_NOT_ALLOWED', 'Acción no soportada.');
     } finally {
@@ -131,10 +139,58 @@ function createUserAction_(body) {
   if (findUserByUsername_(username)) throw apiError_('USERNAME_EXISTS', 'Ese usuario ya existe.');
 
   const id = nextUserId_(role);
-  const profile = registerUser_({ id: id, username: username, name: name, role: role });
+  registerUser_({ id: id, username: username, name: name, role: role });
+  const activation = issueActivation_(id, actor.id);
   touchUser_(actor.id);
   audit_('CREATE_USER', actor.id, id, role, username);
-  return { ok: true, version: FITO_VERSION, profile: profile, users: listUsers_() };
+  return { ok: true, version: FITO_VERSION, activation: activation, users: listUsers_() };
+}
+
+function createActivationAction_(body) {
+  const actor = authenticate_(body);
+  requireAdmin_(actor);
+  const targetId = clean_(body.targetUserId).toUpperCase();
+  const target = findUser_(targetId);
+  if (!target) throw apiError_('USER_NOT_FOUND', 'Usuario no encontrado.');
+  if (target.role === 'ADMIN') throw apiError_('ADMIN_PROTECTED', 'El Administrador principal usa su perfil de recuperación, no códigos temporales.');
+  if (!target.active) throw apiError_('USER_DISABLED', 'Activa el usuario antes de generar un acceso.');
+  const activation = issueActivation_(targetId, actor.id);
+  touchUser_(actor.id);
+  return { ok: true, version: FITO_VERSION, activation: activation };
+}
+
+function redeemActivationAction_(body) {
+  cleanupExpiredActivations_();
+  const code = normalizeActivationCode_(body.activationCode);
+  if (!code) throw apiError_('INVALID_ACTIVATION', 'Código de activación inválido.');
+  const props = PropertiesService.getScriptProperties();
+  const key = activationKey_(code);
+  const raw = props.getProperty(key);
+  if (!raw) throw apiError_('INVALID_ACTIVATION', 'El código no existe, ya fue usado o venció.');
+
+  let activation;
+  try { activation = JSON.parse(raw); } catch (error) { activation = null; }
+  if (!activation || !activation.userId || !activation.expiresAt) {
+    props.deleteProperty(key);
+    throw apiError_('INVALID_ACTIVATION', 'Código de activación inválido.');
+  }
+  if (new Date(activation.expiresAt).getTime() <= Date.now()) {
+    props.deleteProperty(key);
+    throw apiError_('ACTIVATION_EXPIRED', 'El código de activación venció. Solicita uno nuevo al Administrador.');
+  }
+
+  const user = findUser_(clean_(activation.userId).toUpperCase());
+  if (!user) {
+    props.deleteProperty(key);
+    throw apiError_('USER_NOT_FOUND', 'El usuario asociado ya no existe.');
+  }
+  if (!user.active) throw apiError_('USER_DISABLED', 'Este usuario está desactivado.');
+
+  const profile = rotateTokenForUser_(user.id);
+  props.deleteProperty(key);
+  touchUser_(user.id);
+  audit_('REDEEM_ACTIVATION', user.id, user.id, user.role, 'Código de un solo uso consumido');
+  return { ok: true, version: FITO_VERSION, profile: profile, user: publicUser_(findUser_(user.id)) };
 }
 
 function setUserActiveAction_(body) {
@@ -162,7 +218,7 @@ function rotateUserTokenAction_(body) {
   if (target.role === 'ADMIN' && target.id !== actor.id) throw apiError_('ADMIN_PROTECTED', 'No se puede rotar otro Administrador.');
   const profile = rotateTokenForUser_(targetId);
   touchUser_(actor.id);
-  audit_('ROTATE_TOKEN', actor.id, targetId, target.role, 'Token renovado');
+  audit_('ROTATE_TOKEN', actor.id, targetId, target.role, 'Token renovado por compatibilidad');
   return { ok: true, version: FITO_VERSION, profile: profile };
 }
 
@@ -173,6 +229,68 @@ function snapshotAction_(body) {
   const records = snapshotRecords_(limit);
   touchUser_(actor.id);
   return { ok: true, version: FITO_VERSION, records: records, generatedAt: new Date().toISOString() };
+}
+
+function issueActivation_(userId, actorId) {
+  cleanupExpiredActivations_();
+  const user = findUser_(userId);
+  if (!user) throw apiError_('USER_NOT_FOUND', 'Usuario no encontrado.');
+  if (!user.active) throw apiError_('USER_DISABLED', 'El usuario está desactivado.');
+
+  const props = PropertiesService.getScriptProperties();
+  let code = '';
+  let key = '';
+  for (let attempt = 0; attempt < 8; attempt++) {
+    code = generateActivationCode_();
+    key = activationKey_(code);
+    if (!props.getProperty(key)) break;
+    code = '';
+  }
+  if (!code) throw apiError_('ACTIVATION_ERROR', 'No se pudo generar un código único. Intenta nuevamente.');
+
+  const expiresAt = new Date(Date.now() + ACTIVATION_TTL_MS).toISOString();
+  props.setProperty(key, JSON.stringify({ userId: user.id, createdBy: clean_(actorId), expiresAt: expiresAt }));
+  audit_('CREATE_ACTIVATION', clean_(actorId), user.id, user.role, 'Vence ' + expiresAt);
+  return { code: formatActivationCode_(code), expiresAt: expiresAt, user: publicUser_(user) };
+}
+
+function cleanupExpiredActivations_() {
+  const props = PropertiesService.getScriptProperties();
+  const all = props.getProperties();
+  Object.keys(all).forEach(function(key) {
+    if (key.indexOf(ACTIVATION_PREFIX) !== 0) return;
+    try {
+      const item = JSON.parse(all[key]);
+      if (!item.expiresAt || new Date(item.expiresAt).getTime() <= Date.now()) props.deleteProperty(key);
+    } catch (error) {
+      props.deleteProperty(key);
+    }
+  });
+}
+
+function generateActivationCode_() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const source = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    const pair = source.slice(i * 2, i * 2 + 2);
+    code += alphabet[parseInt(pair, 16) % alphabet.length];
+  }
+  return code;
+}
+
+function normalizeActivationCode_(value) {
+  const code = clean_(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return /^[A-Z2-9]{8}$/.test(code) ? code : '';
+}
+
+function formatActivationCode_(code) {
+  const clean = normalizeActivationCode_(code);
+  return clean ? clean.slice(0, 4) + '-' + clean.slice(4) : '';
+}
+
+function activationKey_(code) {
+  return ACTIVATION_PREFIX + sha256Hex_(normalizeActivationCode_(code));
 }
 
 function appendEvaluations_(records, user) {
@@ -188,24 +306,11 @@ function appendEvaluations_(records, user) {
     const indicator = calculateIndicator_(record.capturas, record.trampasRevisadas);
     const gps = record.gps || {};
     sheet.appendRow([
-      Number(record.year),
-      String(record.month || '').toUpperCase(),
-      Number(record.week),
-      parseDate_(record.fecha),
-      String(record.lugar || ''),
-      String(record.fundo || ''),
-      String(record.modulo || ''),
-      String(record.lote || ''),
-      Number(record.capturas),
-      Number(record.trampasRevisadas),
-      7,
-      indicator,
-      String(record.id),
-      user.id,
-      user.name,
-      new Date(record.createdAt || new Date().toISOString()),
-      gps.lat == null ? '' : Number(gps.lat),
-      gps.lon == null ? '' : Number(gps.lon),
+      Number(record.year), String(record.month || '').toUpperCase(), Number(record.week), parseDate_(record.fecha),
+      String(record.lugar || ''), String(record.fundo || ''), String(record.modulo || ''), String(record.lote || ''),
+      Number(record.capturas), Number(record.trampasRevisadas), 7, indicator,
+      String(record.id), user.id, user.name, new Date(record.createdAt || new Date().toISOString()),
+      gps.lat == null ? '' : Number(gps.lat), gps.lon == null ? '' : Number(gps.lon),
       gps.accuracy == null ? '' : Number(gps.accuracy)
     ]);
     confirmed.push(String(record.id));
@@ -270,11 +375,8 @@ function rotateTokenForUser_(id) {
 
 function accessProfile_(id, username, name, role, token) {
   return {
-    type: 'fitosanidad-access-profile',
-    version: 1,
-    serverVersion: FITO_VERSION,
-    user: { id: id, username: username, name: name, role: role },
-    deviceToken: token
+    type: 'fitosanidad-access-profile', version: 1, serverVersion: FITO_VERSION,
+    user: { id: id, username: username, name: name, role: role }, deviceToken: token
   };
 }
 
