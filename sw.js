@@ -12,6 +12,7 @@ const CORE = [
   './js/sync.js',
   './js/qr.js',
   './js/supervision-safe.js',
+  './js/version-ui.js',
   './vendor/qrcode.mjs',
   './data/catalogo-lotes.json',
   './data/lotes-mapa.geojson'
