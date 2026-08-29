@@ -28,6 +28,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Instalar dependencias verificadas
+        run: npm install --ignore-scripts --no-audit --no-fund
+
       - name: Validar aplicación
         run: npm test
 
