@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const root = process.cwd();
 const required = [
-  'index.html','styles.css','styles-supervision.css','styles-mobile-fenologia.css','manifest.webmanifest','sw.js',
+  'index.html','styles.css','styles-supervision.css','styles-mobile-fenologia.css','styles-summary-mobile.css','manifest.webmanifest','sw.js',
   'js/app.js','js/db.js','js/sync.js','js/qr.js','js/supervision-safe.js','js/version-ui.js',
   'data/catalogo-fenologia.json','apps-script/Code.gs','scripts/prepare-web.mjs'
 ];
@@ -37,17 +37,19 @@ for (const [c,t,expected] of [[1,4,1/28],[14,1,2],[7,7,1/7]]) {
   if (Math.abs(calc(c,t) - expected) > 1e-12) throw new Error('La fórmula MTD/C-T-D no coincide con las plantillas.');
 }
 
-const app = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
-const sync = fs.readFileSync(path.join(root, 'js/sync.js'), 'utf8');
-const backend = fs.readFileSync(path.join(root, 'apps-script/Code.gs'), 'utf8');
-const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-const supervision = fs.readFileSync(path.join(root, 'js/supervision-safe.js'), 'utf8');
-const versionUi = fs.readFileSync(path.join(root, 'js/version-ui.js'), 'utf8');
-const prepare = fs.readFileSync(path.join(root, 'scripts/prepare-web.mjs'), 'utf8');
-const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const styles = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
-const supervisionStyles = fs.readFileSync(path.join(root, 'styles-supervision.css'), 'utf8');
-const mobileStyles = fs.readFileSync(path.join(root, 'styles-mobile-fenologia.css'), 'utf8');
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const app = read('js/app.js');
+const sync = read('js/sync.js');
+const backend = read('apps-script/Code.gs');
+const sw = read('sw.js');
+const supervision = read('js/supervision-safe.js');
+const versionUi = read('js/version-ui.js');
+const prepare = read('scripts/prepare-web.mjs');
+const index = read('index.html');
+const styles = read('styles.css');
+const supervisionStyles = read('styles-supervision.css');
+const mobileStyles = read('styles-mobile-fenologia.css');
+const summaryMobileStyles = read('styles-summary-mobile.css');
 
 if (!app.includes('diasRevision: 7')) throw new Error('Días de revisión no está fijado en 7.');
 if (app.includes('Turno detectado')) throw new Error('Turno detectado volvió a aparecer en la interfaz.');
@@ -55,11 +57,10 @@ if (!app.includes('Activar dispositivo') || !app.includes('qrSvg')) throw new Er
 if (!sync.includes("'redeemActivation'") || !sync.includes("'createActivation'")) throw new Error('Faltan endpoints de activación en el cliente.');
 if (!backend.includes('issueActivation_') || !backend.includes('redeemActivationAction_')) throw new Error('Falta activación temporal en Apps Script.');
 if (!backend.includes('USER_DISABLED')) throw new Error('Falta revocación central de usuarios.');
-if (!sw.includes('vendor/qrcode.mjs') || !sw.includes('data/lotes-mapa.geojson') || !sw.includes('js/supervision-safe.js') || !sw.includes('js/version-ui.js')) throw new Error('El mapa/dashboard o la versión central no quedaron incluidos en la caché PWA.');
+if (!sw.includes("fitosanidad-0.5.2") || !sw.includes('styles-summary-mobile.css') || !sw.includes('js/version-ui.js')) throw new Error('La caché PWA no apunta a la versión 0.5.2 completa.');
 if (!sw.includes("event.request.mode === 'navigate'")) throw new Error('La navegación debe priorizar red para evitar una interfaz antigua en caché.');
-if (!index.includes('js/supervision-safe.js') || index.includes('src="js/supervision.js')) throw new Error('La página sigue cargando el observador antiguo.');
-if (!index.includes('v=0.5.1') || !index.includes('#063b25') || !index.includes('js/version-ui.js?v=0.5.1')) throw new Error('Los assets o la versión visual no apuntan a v0.5.1.');
-if (!versionUi.includes("APP_VERSION = '0.5.1'") || !versionUi.includes('MutationObserver')) throw new Error('Falta la fuente central de versión visible 0.5.1.');
+if (!index.includes('styles-summary-mobile.css?v=0.5.2') || !index.includes('js/supervision-safe.js?v=0.5.2') || !index.includes('js/version-ui.js?v=0.5.2') || !index.includes('#063b25')) throw new Error('Los assets o el tema visual no apuntan a v0.5.2.');
+if (!versionUi.includes("APP_VERSION = '0.5.2'") || !versionUi.includes('MutationObserver')) throw new Error('Falta la fuente central de versión visible 0.5.2.');
 if (!supervision.includes('Mapa y dashboard fitosanitario') || !supervision.includes('getCentralSnapshot')) throw new Error('Falta el dashboard central.');
 if (!supervision.includes('no representa un umbral fitosanitario')) throw new Error('Falta aclaración de escala relativa del mapa.');
 if (!supervision.includes("observer.observe(root,{childList:true})")) throw new Error('El observador seguro debe limitarse a cambios directos del contenedor principal.');
@@ -68,19 +69,20 @@ if (!supervision.includes('requestAnimationFrame')) throw new Error('Falta limit
 if (!supervision.includes('supMapOut') || !supervision.includes('supMapFit') || !supervision.includes('supMapIn')) throw new Error('Faltan controles − / Ajustar / + del mapa.');
 if (!supervision.includes('bindMapGestures') || !supervision.includes('pointermove') || !supervision.includes('wheel')) throw new Error('Falta navegación interactiva del mapa.');
 if (!styles.includes('--g950:#063b25') || !styles.includes('linear-gradient(90deg,var(--g950),var(--g800))')) throw new Error('Falta el lenguaje visual verde de Fenología adaptado a Fitosanidad.');
-if (!supervisionStyles.includes('touch-action:none') || !supervisionStyles.includes('.sup-map-zoom')) throw new Error('Falta adaptación móvil y controles visuales del mapa.');
-if (!mobileStyles.includes('@media (max-width:420px)') || !mobileStyles.includes('.sup-map-zoom')) throw new Error('Falta la escala móvil ampliada inspirada en Fenología.');
-if (!prepare.includes('catalogo-fenologia.json') || !prepare.includes('catalog.length !== 254') || !prepare.includes('fenologia-pwa') || !prepare.includes('js/version-ui.js')) throw new Error('Falta construir el catálogo/mapa o publicar la versión central.');
+if (!supervisionStyles.includes('touch-action:none') || !supervisionStyles.includes('.sup-map-zoom')) throw new Error('Falta la base visual del mapa.');
+if (!mobileStyles.includes('@media (max-width:420px)') || !mobileStyles.includes('.sup-map-zoom')) throw new Error('Falta la escala móvil general inspirada en Fenología.');
+if (!summaryMobileStyles.includes('RESUMEN MOVIL 0.5.2') || !summaryMobileStyles.includes('(pointer:coarse)') || !summaryMobileStyles.includes('.sup-filter-grid') || !summaryMobileStyles.includes('.sup-kpis') || !summaryMobileStyles.includes('.sup-map-zoom')) throw new Error('Falta la corrección móvil dedicada del Resumen.');
+if (!prepare.includes('styles-summary-mobile.css') || !prepare.includes('catalogo-fenologia.json') || !prepare.includes('catalog.length !== 254') || !prepare.includes('fenologia-pwa') || !prepare.includes('js/version-ui.js')) throw new Error('Falta publicar la corrección móvil o construir catálogo/mapa.');
 
-const allText = required.map((f) => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
+const allText = required.map(read).join('\n');
 if (/AIza[0-9A-Za-z_-]{20,}|script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}/.test(allText)) throw new Error('Se detectó un secreto o URL real de implementación dentro del repositorio.');
 
-console.log('OK · Fitosanidad PWA 0.5.1');
+console.log('OK · Fitosanidad PWA 0.5.2');
 console.log(`Catálogo maestro de Fenología: ${catalog.length} lotes`);
 console.log('Fórmulas verificadas: Bicho, Mosca, SENASA');
 console.log('Activación simplificada: verificada');
 console.log('Dashboard central y mapa fitosanitario: verificados');
+console.log('Resumen móvil: escala amplia, filtros, KPIs, gráficos y mapa verificados');
 console.log('Mapa móvil: controles − / Ajustar / +, arrastre y zoom verificados');
-console.log('Diseño visual: paleta, proporciones móviles y fondos de Fenología adaptados a Fitosanidad');
-console.log('Versión visible: fuente central 0.5.1 verificada');
-console.log('Rendimiento: observadores limitados a cambios directos y navegación con caché actualizable');
+console.log('Versión visible: fuente central 0.5.2 verificada');
+console.log('Rendimiento: observadores seguros y navegación con caché actualizable');

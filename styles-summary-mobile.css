@@ -1,0 +1,372 @@
+/* RESUMEN MOVIL 0.5.2
+   Ajuste dedicado al dashboard fitosanitario. Se carga después del resto de estilos
+   para garantizar una escala cómoda en teléfonos, incluso cuando Chrome reporta
+   un viewport más ancho de lo esperado. */
+
+@media (max-width:900px), (pointer:coarse) and (max-width:1200px){
+  .page:has(.sup-dashboard){
+    padding:24px 14px 104px!important;
+    overflow-x:clip!important;
+  }
+
+  .sup-dashboard{
+    width:100%!important;
+    max-width:100%!important;
+    min-width:0!important;
+    display:grid!important;
+    gap:20px!important;
+    font-size:16px!important;
+    overflow:visible!important;
+  }
+  .sup-dashboard>*,
+  .sup-dashboard section,
+  .sup-dashboard article,
+  .sup-dashboard div{
+    min-width:0;
+  }
+
+  .sup-card{
+    width:100%!important;
+    max-width:100%!important;
+    padding:22px 20px!important;
+    border-radius:24px!important;
+    box-sizing:border-box!important;
+  }
+
+  /* Filtros */
+  .sup-filters{
+    padding:24px 20px!important;
+  }
+  .sup-filters .sup-head{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) auto!important;
+    align-items:start!important;
+    gap:14px!important;
+    margin-bottom:24px!important;
+  }
+  .sup-eyebrow{
+    font-size:13px!important;
+    line-height:1.2!important;
+    letter-spacing:.14em!important;
+  }
+  .sup-head h2,
+  .sup-chart-head h3{
+    margin:6px 0 8px!important;
+    font-size:27px!important;
+    line-height:1.16!important;
+  }
+  .sup-head p{
+    font-size:15px!important;
+    line-height:1.55!important;
+  }
+  .sup-filters #supRefresh{
+    width:auto!important;
+    min-width:116px!important;
+    min-height:48px!important;
+    padding:11px 15px!important;
+    font-size:14px!important;
+    border-radius:13px!important;
+  }
+  .sup-filter-grid{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:17px!important;
+    align-items:stretch!important;
+  }
+  .sup-filter-grid label{
+    display:flex!important;
+    flex-direction:column!important;
+    gap:9px!important;
+    font-size:15px!important;
+    line-height:1.25!important;
+  }
+  .sup-filter-grid input,
+  .sup-filter-grid select{
+    width:100%!important;
+    min-height:58px!important;
+    padding:14px 15px!important;
+    border-radius:15px!important;
+    font-size:16px!important;
+    line-height:1.25!important;
+  }
+  .sup-clear{
+    width:100%!important;
+    min-height:54px!important;
+    padding:12px 16px!important;
+    border-radius:14px!important;
+    font-size:15px!important;
+  }
+
+  /* KPIs */
+  .sup-kpis{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:12px!important;
+  }
+  .sup-kpis article{
+    min-height:112px!important;
+    padding:17px!important;
+    border-radius:20px!important;
+    display:flex!important;
+    flex-direction:column!important;
+    justify-content:center!important;
+  }
+  .sup-kpis article:last-child{
+    grid-column:1/-1!important;
+    min-height:104px!important;
+  }
+  .sup-kpis span{
+    font-size:13px!important;
+    line-height:1.25!important;
+  }
+  .sup-kpis strong{
+    margin:6px 0!important;
+    font-size:30px!important;
+    line-height:1.08!important;
+  }
+  .sup-kpis small{
+    font-size:11px!important;
+    line-height:1.35!important;
+  }
+
+  /* Tarjetas por evaluación */
+  .sup-type-grid,
+  .sup-chart-grid{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:15px!important;
+  }
+  .sup-type-grid .sup-card{
+    padding:22px 20px!important;
+  }
+  .sup-type-grid h3{
+    min-height:0!important;
+    margin:10px 0 16px!important;
+    font-size:23px!important;
+    line-height:1.2!important;
+  }
+  .sup-type-metrics{
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:9px!important;
+    margin-top:12px!important;
+  }
+  .sup-type-metrics div{
+    padding:13px 10px!important;
+    border-radius:14px!important;
+  }
+  .sup-type-metrics b{
+    font-size:22px!important;
+    line-height:1.1!important;
+  }
+  .sup-type-metrics small{
+    margin-top:4px!important;
+    font-size:11px!important;
+    line-height:1.25!important;
+  }
+
+  /* Gráficos */
+  .sup-chart{
+    min-height:280px!important;
+  }
+  .sup-chart-head{
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:flex-start!important;
+    gap:4px!important;
+    margin-bottom:16px!important;
+  }
+  .sup-chart-head h3{
+    font-size:23px!important;
+  }
+  .sup-chart-head span{
+    font-size:12px!important;
+    line-height:1.4!important;
+    text-align:left!important;
+  }
+  .sup-bars{
+    gap:12px!important;
+  }
+  .sup-bar-row{
+    grid-template-columns:minmax(100px,1.25fr) minmax(80px,2fr) 48px!important;
+    gap:9px!important;
+    font-size:12px!important;
+  }
+  .sup-bar-row b{
+    font-size:12px!important;
+  }
+  .sup-bar-track{
+    height:12px!important;
+  }
+  .sup-line text{
+    font-size:11px!important;
+  }
+
+  /* Mapa */
+  .sup-map-section{
+    padding:0!important;
+    border-radius:24px!important;
+    overflow:hidden!important;
+  }
+  .sup-map-section>.sup-head{
+    padding:24px 20px 0!important;
+    margin-bottom:18px!important;
+  }
+  .sup-map-layout{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:15px!important;
+    padding:0 20px 20px!important;
+  }
+  .sup-map-card{
+    width:100%!important;
+    border-radius:18px!important;
+    overflow:hidden!important;
+  }
+  .sup-map-toolbar{
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    gap:13px!important;
+    padding:13px 14px!important;
+  }
+  .sup-map-legend{
+    gap:10px!important;
+    font-size:11px!important;
+    line-height:1.4!important;
+  }
+  .sup-map-legend i{
+    width:13px!important;
+    height:13px!important;
+  }
+  .sup-map-zoom{
+    width:100%!important;
+    align-self:stretch!important;
+    display:grid!important;
+    grid-template-columns:52px minmax(112px,1fr) 52px!important;
+    gap:8px!important;
+  }
+  .sup-map-zoom button{
+    width:100%!important;
+    height:49px!important;
+    min-width:0!important;
+    padding:0 10px!important;
+    border-radius:12px!important;
+    font-size:16px!important;
+  }
+  .sup-map-canvas,
+  .sup-map-canvas svg{
+    width:100%!important;
+    min-height:470px!important;
+  }
+  .sup-map-hint{
+    padding:11px 14px!important;
+    font-size:12px!important;
+    line-height:1.4!important;
+  }
+  .sup-map-detail{
+    width:100%!important;
+    padding:18px!important;
+    border-radius:18px!important;
+  }
+  .sup-map-detail h3{
+    margin:6px 0 16px!important;
+    font-size:27px!important;
+  }
+  .sup-map-detail dl{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:10px!important;
+  }
+  .sup-map-detail dl div{
+    padding:12px!important;
+    border-radius:12px!important;
+  }
+  .sup-map-detail dt{
+    font-size:10px!important;
+  }
+  .sup-map-detail dd{
+    font-size:14px!important;
+  }
+  .sup-map-detail p{
+    font-size:13px!important;
+    line-height:1.5!important;
+  }
+
+  /* Tabla sin ensanchar toda la página */
+  .sup-dashboard .table-wrap{
+    width:100%!important;
+    max-width:100%!important;
+    overflow-x:auto!important;
+    -webkit-overflow-scrolling:touch!important;
+    border-radius:18px!important;
+  }
+  .sup-dashboard table{
+    min-width:760px!important;
+  }
+  .sup-dashboard th,
+  .sup-dashboard td{
+    padding:13px 14px!important;
+    font-size:13px!important;
+  }
+}
+
+@media (max-width:430px), (pointer:coarse) and (max-width:600px){
+  .page:has(.sup-dashboard){
+    padding:22px 13px 102px!important;
+  }
+  .sup-dashboard{
+    gap:18px!important;
+  }
+  .sup-card,
+  .sup-filters{
+    padding:21px 18px!important;
+  }
+  .sup-filters .sup-head{
+    grid-template-columns:1fr!important;
+    gap:12px!important;
+    margin-bottom:22px!important;
+  }
+  .sup-filters #supRefresh{
+    width:100%!important;
+    min-height:52px!important;
+  }
+  .sup-head h2,
+  .sup-chart-head h3{
+    font-size:25px!important;
+  }
+  .sup-head p{
+    font-size:15px!important;
+  }
+  .sup-kpis{
+    gap:10px!important;
+  }
+  .sup-kpis article{
+    min-height:108px!important;
+    padding:15px!important;
+  }
+  .sup-kpis strong{
+    font-size:29px!important;
+  }
+  .sup-type-metrics{
+    gap:7px!important;
+  }
+  .sup-type-metrics div{
+    padding:12px 8px!important;
+  }
+  .sup-type-metrics b{
+    font-size:20px!important;
+  }
+  .sup-map-section>.sup-head{
+    padding:22px 18px 0!important;
+  }
+  .sup-map-layout{
+    padding:0 14px 18px!important;
+  }
+  .sup-map-canvas,
+  .sup-map-canvas svg{
+    min-height:440px!important;
+  }
+  .sup-map-detail dl{
+    grid-template-columns:1fr 1fr!important;
+  }
+}

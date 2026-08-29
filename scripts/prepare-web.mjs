@@ -14,6 +14,7 @@ const files = [
   'styles.css',
   'styles-supervision.css',
   'styles-mobile-fenologia.css',
+  'styles-summary-mobile.css',
   'manifest.webmanifest',
   'sw.js',
   'js/app.js',
