@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Evaluaciones fitosanitarias offline con sincronización central para campo.",
   "scripts": {
-    "test": "node scripts/verify.mjs"
+    "test": "node scripts/verify.mjs",
+    "build:web": "node scripts/prepare-web.mjs"
   },
   "engines": {
     "node": ">=22"
