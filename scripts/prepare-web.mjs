@@ -13,6 +13,7 @@ const files = [
   'index.html',
   'styles.css',
   'styles-supervision.css',
+  'styles-mobile-fenologia.css',
   'manifest.webmanifest',
   'sw.js',
   'js/app.js',
