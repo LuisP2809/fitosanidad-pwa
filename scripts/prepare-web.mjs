@@ -19,7 +19,7 @@ const files = [
   'js/db.js',
   'js/sync.js',
   'js/qr.js',
-  'js/supervision.js',
+  'js/supervision-safe.js',
   'icons/icon.svg'
 ];
 
