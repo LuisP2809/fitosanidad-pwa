@@ -15,6 +15,7 @@ const files = [
   'js/app.js',
   'js/db.js',
   'js/sync.js',
+  'js/qr.js',
   'data/catalogo-lotes.json',
   'icons/icon.svg'
 ];
@@ -27,6 +28,12 @@ for (const relative of files) {
   fs.copyFileSync(source, target);
 }
 
+const qrSource = path.join(root, 'node_modules', 'qrcode-generator', 'dist', 'qrcode.mjs');
+const qrTarget = path.join(out, 'vendor', 'qrcode.mjs');
+if (!fs.existsSync(qrSource)) throw new Error('Falta qrcode-generator. Ejecuta npm install.');
+fs.mkdirSync(path.dirname(qrTarget), { recursive: true });
+fs.copyFileSync(qrSource, qrTarget);
+
 fs.writeFileSync(path.join(out, '.nojekyll'), '');
 console.log(`Sitio preparado en ${out}`);
-console.log(`Archivos públicos: ${files.length + 1}`);
+console.log(`Archivos públicos: ${files.length + 2}`);
