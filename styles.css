@@ -43,6 +43,7 @@ button { cursor: pointer; }
 .field input, .field select { width: 100%; border: 1px solid #cbdad2; border-radius: 12px; padding: 11px 12px; background: #fff; color: #18312a; }
 .field input:focus, .field select:focus { outline: 3px solid rgba(23,107,67,.13); border-color: var(--green); }
 .readonly { padding: 10px 12px; border: 1px dashed #bdd1c6; background: #f6faf8; border-radius: 12px; font-weight: 700; }
+.field:has(#turnoValue) { display: none; }
 .indicator { margin: 18px 0; padding: 16px; background: var(--green-soft); border-radius: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .indicator strong { font-size: 28px; color: var(--green-2); }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
