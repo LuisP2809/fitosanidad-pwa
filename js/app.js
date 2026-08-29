@@ -1,16 +1,18 @@
 import { db, importAccessProfile, verifyUser } from './db.js';
+import { qrSvg } from './qr.js';
 import {
   CentralApiError,
   checkCentralAccess,
   syncPending,
   listCentralUsers,
   createCentralUser,
+  createCentralActivation,
   setCentralUserActive,
-  rotateCentralUserToken,
+  redeemActivation,
   getCentralSnapshot
 } from './sync.js';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 const TYPES = {
   bicho: { title: 'Bicho del cesto', icon: '🐛', captureLabel: 'Capturas', indicator: 'C/T/D' },
   mosca: { title: 'Mosca de la fruta', icon: '🪰', captureLabel: 'Moscas capturadas', indicator: 'MTD' },
@@ -30,7 +32,7 @@ function esc(value = '') {
   return String(value).replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
 }
 
-function toast(message, duration = 3000) {
+function toast(message, duration = 3200) {
   toastEl.textContent = message;
   toastEl.classList.add('show');
   clearTimeout(toastEl._timer);
@@ -70,6 +72,35 @@ function formatIndicator(value) {
 
 function roleLabel(role) {
   return role === 'ADMIN' ? 'Administrador' : role === 'SUPERVISOR' ? 'Supervisor' : 'Evaluador';
+}
+
+function formatExpiry(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function activationParamsFromUrl(url = location.href) {
+  try {
+    const parsed = new URL(url, location.href);
+    return {
+      code: String(parsed.searchParams.get('activate') || '').trim(),
+      endpoint: String(parsed.searchParams.get('server') || '').trim()
+    };
+  } catch {
+    return { code: '', endpoint: '' };
+  }
+}
+
+function normalizeCode(value) {
+  const clean = String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return clean.length === 8 ? `${clean.slice(0,4)}-${clean.slice(4)}` : String(value || '').trim().toUpperCase();
+}
+
+function buildActivationLink(activation) {
+  const url = new URL(location.origin + location.pathname);
+  url.searchParams.set('activate', activation.code);
+  url.searchParams.set('server', currentUser.syncEndpoint);
+  return url.toString();
 }
 
 function getGps() {
@@ -120,50 +151,61 @@ function shell(content, active = currentView) {
     </div>`;
 }
 
-function importAccessMarkup(showBack = false) {
-  return `
-    <div class="login-wrap"><section class="login-card">
-      <h1>Vincular acceso</h1>
-      <p class="muted">Importa el perfil entregado por el Administrador y crea un PIN local para este dispositivo.</p>
-      <form id="accessForm">
-        <div class="field"><label>URL de Google Apps Script</label><input name="endpoint" type="url" placeholder="https://script.google.com/macros/s/.../exec" required></div>
-        <div class="field"><label>Perfil de acceso</label><textarea name="profile" rows="8" spellcheck="false" style="width:100%;border:1px solid #cbdad2;border-radius:12px;padding:11px 12px;font:inherit;resize:vertical" placeholder='{"type":"fitosanidad-access-profile",...}' required></textarea></div>
-        <div class="field"><label>PIN local (mínimo 6 dígitos)</label><input name="pin" type="password" inputmode="numeric" minlength="6" pattern="[0-9]{6,}" required></div>
-        <div class="field"><label>Repite el PIN</label><input name="pin2" type="password" inputmode="numeric" minlength="6" pattern="[0-9]{6,}" required></div>
-        <button class="btn" type="submit">Vincular dispositivo</button>
-        ${showBack ? '<button class="btn ghost" type="button" id="backLogin">Volver al inicio de sesión</button>' : ''}
+function renderActivation(prefill = activationParamsFromUrl()) {
+  const hasLinkData = Boolean(prefill.code && prefill.endpoint);
+  app.innerHTML = `
+    <div class="login-wrap"><section class="login-card activation-card">
+      <div class="activation-icon">✓</div>
+      <h1>Activar dispositivo</h1>
+      <p class="muted">${hasLinkData ? 'Acceso detectado. Crea tu PIN y termina la activación.' : 'Escanea el QR o pega el enlace/código que te entregó el Administrador.'}</p>
+      <form id="activationForm">
+        <div class="field">
+          <label>Código o enlace de activación</label>
+          <input name="activation" value="${esc(prefill.code || '')}" placeholder="ABCD-2345 o pega el enlace" autocomplete="one-time-code" required>
+        </div>
+        <details class="advanced-box" ${prefill.endpoint ? 'open':''}>
+          <summary>Servidor ${prefill.endpoint ? 'detectado ✓' : '(solo si escribes el código manualmente)'}</summary>
+          <div class="field" style="margin-top:10px"><input name="endpoint" type="url" value="${esc(prefill.endpoint || '')}" placeholder="https://script.google.com/macros/s/.../exec"></div>
+        </details>
+        <div class="field"><label>Crea tu PIN (mínimo 6 números)</label><input name="pin" type="password" inputmode="numeric" minlength="6" pattern="[0-9]{6,}" autocomplete="new-password" required></div>
+        <div class="field"><label>Repite el PIN</label><input name="pin2" type="password" inputmode="numeric" minlength="6" pattern="[0-9]{6,}" autocomplete="new-password" required></div>
+        <button class="btn" type="submit">Activar y entrar</button>
+        <button class="btn ghost" type="button" id="goLogin">Ya tengo acceso</button>
       </form>
-      <p class="note">El token central se guarda únicamente en este dispositivo. Tu PIN no se envía a Google Apps Script.</p>
+      <p class="note">El código es de un solo uso. Después, el ingreso normal será únicamente con Usuario + PIN.</p>
     </section></div>`;
-}
 
-function renderImportAccess(showBack = false) {
-  app.innerHTML = importAccessMarkup(showBack);
-  document.querySelector('#backLogin')?.addEventListener('click', renderLogin);
-  document.querySelector('#accessForm').addEventListener('submit', async (event) => {
+  document.querySelector('#goLogin').addEventListener('click', renderLogin);
+  document.querySelector('#activationForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     if (form.get('pin') !== form.get('pin2')) return toast('Los PIN no coinciden.');
-    let profile;
-    try { profile = JSON.parse(String(form.get('profile') || '').trim()); }
-    catch { return toast('El perfil de acceso no es JSON válido.'); }
+
+    const rawActivation = String(form.get('activation') || '').trim();
+    let code = rawActivation;
+    let endpoint = String(form.get('endpoint') || '').trim();
+    if (/^https?:\/\//i.test(rawActivation)) {
+      const parsed = activationParamsFromUrl(rawActivation);
+      code = parsed.code;
+      endpoint = parsed.endpoint || endpoint;
+    }
+    code = normalizeCode(code);
+    if (!endpoint) return toast('Este dispositivo aún no conoce el servidor. Escanea el QR o pega el enlace completo.', 4800);
+
     try {
-      const user = await importAccessProfile(profile, form.get('endpoint'), form.get('pin'));
-      if (navigator.onLine) {
-        try {
-          const result = await checkCentralAccess(user);
-          currentUser = result.localUser || user;
-        } catch (error) {
-          currentUser = null;
-          throw error;
-        }
-      } else {
-        currentUser = user;
-      }
-      toast('Dispositivo vinculado correctamente.');
+      const result = await redeemActivation(endpoint, code);
+      const user = await importAccessProfile(result.profile, endpoint, form.get('pin'));
+      await db.setSetting('lastServerEndpoint', endpoint);
+      const checked = await checkCentralAccess(user);
+      currentUser = checked.localUser || user;
+      history.replaceState({}, '', location.pathname);
+      toast('Dispositivo activado correctamente.');
       renderHome();
     } catch (error) {
-      toast(error.message || 'No se pudo vincular el acceso.', 4500);
+      const message = error.code === 'ACTIVATION_EXPIRED'
+        ? 'El código venció. Solicita uno nuevo al Administrador.'
+        : error.message || 'No se pudo activar el dispositivo.';
+      toast(message, 5000);
     }
   });
 }
@@ -177,11 +219,12 @@ function renderLogin() {
         <div class="field"><label>Usuario</label><input name="username" autocomplete="username" required></div>
         <div class="field"><label>PIN</label><input name="pin" type="password" inputmode="numeric" autocomplete="current-password" required></div>
         <button class="btn" type="submit">Iniciar sesión</button>
-        <button class="btn ghost" type="button" id="importAccess">Importar o actualizar acceso</button>
+        <button class="btn ghost" type="button" id="activateDevice">Activar este dispositivo</button>
       </form>
       <p class="note">Después de una validación online exitosa puedes seguir registrando evaluaciones sin internet.</p>
     </section></div>`;
-  document.querySelector('#importAccess').addEventListener('click', () => renderImportAccess(true));
+
+  document.querySelector('#activateDevice').addEventListener('click', () => renderActivation({ code: '', endpoint: '' }));
   document.querySelector('#loginForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -193,7 +236,7 @@ function renderLogin() {
         currentUser = result.localUser || user;
       } catch (error) {
         if (error instanceof CentralApiError && ['USER_DISABLED','UNAUTHORIZED'].includes(error.code)) {
-          return toast(error.code === 'USER_DISABLED' ? 'Tu usuario está desactivado.' : 'El perfil central ya no es válido.', 4500);
+          return toast(error.code === 'USER_DISABLED' ? 'Tu usuario está desactivado.' : 'Este acceso ya fue reemplazado. Solicita un código nuevo.', 5000);
         }
         currentUser = user;
         toast('No se pudo validar el servidor; se habilitó el modo local.', 4500);
@@ -218,7 +261,7 @@ function renderHome() {
           <button class="btn" data-eval="${key}">Nueva evaluación</button>
         </article>`).join('')}
     </section>` : ''}
-    ${currentUser.role !== 'EVALUADOR' ? `<div class="section-title"><h2>Supervisión</h2></div><div class="card"><p>Los registros confirmados de todos los evaluadores ya pueden consultarse desde el resumen central cuando hay internet.</p><button class="btn secondary" data-nav="summary">Ver resumen central</button></div>` : ''}
+    ${currentUser.role !== 'EVALUADOR' ? `<div class="section-title"><h2>Supervisión</h2></div><div class="card"><p>Los registros confirmados de todos los evaluadores pueden consultarse desde el resumen central cuando hay internet.</p><button class="btn secondary" data-nav="summary">Ver resumen central</button></div>` : ''}
   `);
   bindShell();
   document.querySelectorAll('[data-eval]').forEach((button) => button.addEventListener('click', () => renderEvaluation(button.dataset.eval)));
@@ -245,8 +288,7 @@ function renderEvaluation(typeKey) {
           <div class="field full"><label>Lote</label><select name="lote" required disabled>${options([], 'Selecciona lote')}</select></div>
           <div class="field"><label>${type.captureLabel}</label><input type="number" name="capturas" min="0" step="1" value="0" required></div>
           <div class="field"><label>Trampas revisadas</label><input type="number" name="trampas" min="1" step="1" required></div>
-          <div class="field"><label>Días de revisión</label><div class="readonly">7 🔒</div></div>
-          <div class="field"><label>Turno detectado</label><div class="readonly" id="turnoValue">—</div></div>
+          <div class="field full"><label>Días de revisión</label><div class="readonly">7 🔒</div></div>
         </div>
         <div class="indicator"><div><span class="muted">${type.indicator} calculado</span><div>Capturas ÷ (trampas × 7)</div></div><strong id="indicatorValue">0.00</strong></div>
         <button class="btn" type="submit">Guardar evaluación</button>
@@ -269,22 +311,15 @@ function renderEvaluation(typeKey) {
     fundo.disabled = !campo.value;
     modulo.innerHTML = options([], 'Selecciona módulo'); modulo.disabled = true;
     lote.innerHTML = options([], 'Selecciona lote'); lote.disabled = true;
-    document.querySelector('#turnoValue').textContent = '—';
   });
   fundo.addEventListener('change', () => {
     modulo.innerHTML = options(unique(catalog.filter((x) => x.campo === campo.value && x.fundo === fundo.value).map((x) => x.modulo)), 'Selecciona módulo');
     modulo.disabled = !fundo.value;
     lote.innerHTML = options([], 'Selecciona lote'); lote.disabled = true;
-    document.querySelector('#turnoValue').textContent = '—';
   });
   modulo.addEventListener('change', () => {
     lote.innerHTML = options(unique(catalog.filter((x) => x.campo === campo.value && x.fundo === fundo.value && x.modulo === modulo.value).map((x) => x.lote)), 'Selecciona lote');
     lote.disabled = !modulo.value;
-    document.querySelector('#turnoValue').textContent = '—';
-  });
-  lote.addEventListener('change', () => {
-    const row = catalog.find((x) => x.lote === lote.value && x.modulo === modulo.value && x.fundo === fundo.value && x.campo === campo.value);
-    document.querySelector('#turnoValue').textContent = row?.turno ? `T${row.turno}` : '—';
   });
 
   const updateIndicator = () => {
@@ -310,7 +345,7 @@ function renderEvaluation(typeKey) {
     const record = {
       id: crypto.randomUUID(), tipo: typeKey, tipoNombre: type.title,
       fecha: form.elements.fecha.value, year, month, week,
-      lugar: selected.campo, fundo: selected.fundo, modulo: selected.modulo, lote: selected.lote, turno: selected.turno || '',
+      lugar: selected.campo, fundo: selected.fundo, modulo: selected.modulo, lote: selected.lote,
       capturas: capturesValue, trampasRevisadas: trapsValue, diasRevision: 7,
       indicador: indicator, indicadorNombre: type.indicator,
       evaluadorId: currentUser.id, evaluador: currentUser.name, gps,
@@ -445,22 +480,30 @@ async function renderSync() {
   });
 }
 
-function profileWithEndpoint(profile) {
-  return { ...profile, endpoint: currentUser.syncEndpoint };
-}
-
-function profileBox(profile, title = 'Perfil de acceso generado') {
-  const json = JSON.stringify(profileWithEndpoint(profile), null, 2);
+function activationBox(activation, title = 'Acceso temporal generado') {
+  const link = buildActivationLink(activation);
+  const svg = qrSvg(link);
   return `
-    <section class="card" id="profileBox">
-      <h3>${esc(title)}</h3>
-      <p class="note">Este perfil contiene el token del dispositivo. Entrégalo únicamente a la persona correspondiente y bórralo de mensajes/archivos cuando termine la instalación.</p>
-      <div class="field"><textarea id="profileOutput" rows="12" readonly style="width:100%;border:1px solid #cbdad2;border-radius:12px;padding:11px 12px;font:inherit;resize:vertical">${esc(json)}</textarea></div>
-      <button class="btn secondary" id="copyProfile">Copiar perfil</button>
+    <section class="card activation-output" id="activationBox">
+      <div class="section-title"><h3>${esc(title)}</h3><span class="badge pending">1 solo uso</span></div>
+      <p class="muted"><strong>${esc(activation.user?.name || '')}</strong> · ${esc(roleLabel(activation.user?.role || 'EVALUADOR'))}</p>
+      <div class="activation-layout">
+        <div class="qr-wrap" aria-label="Código QR de activación">${svg}</div>
+        <div class="activation-info">
+          <span class="muted">Código</span>
+          <div class="activation-code">${esc(activation.code)}</div>
+          <p class="note">Vence: ${esc(formatExpiry(activation.expiresAt))}. Al usarse, invalida el acceso anterior de ese usuario.</p>
+          <div class="activation-actions">
+            <button class="btn secondary" id="copyActivationLink">Copiar enlace</button>
+            <button class="btn" id="shareActivation">Compartir</button>
+          </div>
+        </div>
+      </div>
+      <input id="activationLink" class="sr-only" value="${esc(link)}" readonly>
     </section>`;
 }
 
-async function renderAdmin(profile = null, profileTitle = '') {
+async function renderAdmin(activation = null, activationTitle = '') {
   if (currentUser.role !== 'ADMIN') return renderHome();
   currentView = 'admin';
   let users = centralUsersCache;
@@ -475,42 +518,54 @@ async function renderAdmin(profile = null, profileTitle = '') {
       loadError = error.message;
     }
   }
+
   app.innerHTML = shell(`
     <div class="section-title"><h2>Administración central</h2></div>
     ${loadError ? `<div class="note">No se pudo actualizar la lista central: ${esc(loadError)}</div>` : ''}
-    <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+    <div class="grid admin-grid">
       <section class="card">
         <h3>Crear usuario</h3>
+        <p class="muted">Se generará automáticamente un QR y código temporal.</p>
         <form id="userForm">
           <div class="field"><label>Nombre</label><input name="name" required></div>
           <div class="field"><label>Usuario</label><input name="username" pattern="[a-zA-Z0-9._-]{3,30}" required></div>
           <div class="field"><label>Rol</label><select name="role"><option value="EVALUADOR">Evaluador</option><option value="SUPERVISOR">Supervisor</option></select></div>
-          <button class="btn" type="submit" style="margin-top:10px" ${navigator.onLine ? '':'disabled'}>Crear usuario central</button>
+          <button class="btn" type="submit" style="margin-top:10px" ${navigator.onLine ? '':'disabled'}>Crear y generar acceso</button>
         </form>
       </section>
       <section class="card">
         <h3>Estado central</h3>
         <p><strong>${users.filter((u) => u.active).length}</strong> usuarios activos.</p>
-        <p class="muted">La desactivación se hace efectiva en el siguiente contacto del dispositivo con el servidor.</p>
+        <p class="muted">Los accesos temporales vencen en 24 horas y solo pueden usarse una vez.</p>
         <button class="btn secondary" id="refreshUsers" ${navigator.onLine ? '':'disabled'}>Actualizar usuarios</button>
       </section>
     </div>
-    ${profile ? profileBox(profile, profileTitle) : ''}
+    ${activation ? activationBox(activation, activationTitle) : ''}
     <div class="section-title"><h2>Usuarios</h2></div>
     <div class="card user-list">${users.length ? users.map((u) => `
       <div class="user-row">
         <div><strong>${esc(u.name)}</strong><div class="muted">${esc(u.username)} · ${esc(u.id)} · ${roleLabel(u.role)}</div></div>
         <div class="toolbar" style="margin:0">
-          ${u.role === 'ADMIN' ? '<span class="badge synced">Administrador</span>' : `<button class="btn ${u.active ? 'danger':'secondary'} small" data-toggle-user="${esc(u.id)}" data-active="${u.active ? '1':'0'}">${u.active ? 'Desactivar':'Activar'}</button><button class="btn ghost small" data-rotate-user="${esc(u.id)}">Nuevo acceso</button>`}
+          ${u.role === 'ADMIN' ? '<span class="badge synced">Administrador</span>' : `<button class="btn ${u.active ? 'danger':'secondary'} small" data-toggle-user="${esc(u.id)}" data-active="${u.active ? '1':'0'}">${u.active ? 'Desactivar':'Activar'}</button><button class="btn ghost small" data-new-activation="${esc(u.id)}" ${u.active ? '':'disabled'}>Nuevo acceso</button>`}
         </div>
       </div>`).join('') : '<div class="empty">Sin usuarios centrales cargados.</div>'}</div>
   `, 'admin');
   bindShell();
 
-  document.querySelector('#copyProfile')?.addEventListener('click', async () => {
-    const text = document.querySelector('#profileOutput').value;
-    try { await navigator.clipboard.writeText(text); toast('Perfil copiado.'); }
-    catch { document.querySelector('#profileOutput').select(); toast('Selecciona y copia el perfil manualmente.'); }
+  document.querySelector('#copyActivationLink')?.addEventListener('click', async () => {
+    const text = document.querySelector('#activationLink').value;
+    try { await navigator.clipboard.writeText(text); toast('Enlace de activación copiado.'); }
+    catch { toast('No se pudo copiar automáticamente. Usa Compartir.', 4200); }
+  });
+
+  document.querySelector('#shareActivation')?.addEventListener('click', async () => {
+    const text = document.querySelector('#activationLink').value;
+    const shareData = { title: 'Acceso Fitosanidad', text: `Activa Fitosanidad con el código ${activation.code}`, url: text };
+    if (navigator.share) {
+      try { await navigator.share(shareData); return; } catch (error) { if (error.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(text); toast('Enlace copiado para compartir.'); }
+    catch { toast('Comparte el QR mostrado en pantalla.', 4200); }
   });
 
   document.querySelector('#refreshUsers')?.addEventListener('click', () => renderAdmin());
@@ -520,8 +575,8 @@ async function renderAdmin(profile = null, profileTitle = '') {
     try {
       const result = await createCentralUser(currentUser, { name: form.get('name'), username: form.get('username'), role: form.get('role') });
       centralUsersCache = result.users || centralUsersCache;
-      toast('Usuario central creado.');
-      renderAdmin(result.profile, 'Perfil nuevo: guárdalo antes de salir');
+      toast('Usuario creado. Comparte el QR o enlace.');
+      renderAdmin(result.activation, 'Nuevo acceso: compártelo con el usuario');
     } catch (error) { toast(error.message || 'No se pudo crear el usuario.', 4500); }
   });
 
@@ -535,12 +590,11 @@ async function renderAdmin(profile = null, profileTitle = '') {
     } catch (error) { toast(error.message, 4500); }
   }));
 
-  document.querySelectorAll('[data-rotate-user]').forEach((button) => button.addEventListener('click', async () => {
-    if (!confirm('El acceso anterior dejará de sincronizar. ¿Generar un token nuevo?')) return;
+  document.querySelectorAll('[data-new-activation]').forEach((button) => button.addEventListener('click', async () => {
     try {
-      const result = await rotateCentralUserToken(currentUser, button.dataset.rotateUser);
-      renderAdmin(result.profile, 'Acceso renovado: reemplaza el perfil anterior');
-    } catch (error) { toast(error.message, 4500); }
+      const result = await createCentralActivation(currentUser, button.dataset.newActivation);
+      renderAdmin(result.activation, 'Acceso temporal renovado');
+    } catch (error) { toast(error.message || 'No se pudo generar el acceso.', 4500); }
   }));
 }
 
@@ -559,32 +613,25 @@ function navigate(view) {
 
 function handleDisabledUser() {
   currentUser = null;
-  toast('El usuario fue desactivado en el sistema central.', 4500);
-  setTimeout(renderLogin, 800);
+  toast('Tu usuario fue desactivado por el Administrador.', 5000);
+  renderLogin();
 }
 
-async function boot() {
+async function start() {
   try {
     await loadCatalog();
-    const users = await db.getAll('usuarios');
-    if (!users.length) renderImportAccess(false); else renderLogin();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
-    window.addEventListener('online', () => {
-      document.querySelectorAll('.dot').forEach((dot) => { dot.classList.remove('offline'); dot.classList.add('online'); });
-      if (currentUser) {
-        checkCentralAccess(currentUser).then((result) => {
-          if (result.localUser) currentUser = result.localUser;
-          return syncPending(currentUser);
-        }).then((result) => { if (result?.confirmed) toast(`${result.confirmed} registros sincronizados.`); })
-          .catch((error) => { if (error.code === 'USER_DISABLED') handleDisabledUser(); });
-      }
-    });
-    window.addEventListener('offline', () => {
-      document.querySelectorAll('.dot').forEach((dot) => { dot.classList.remove('online'); dot.classList.add('offline'); });
-    });
+    const params = activationParamsFromUrl();
+    if (params.code) return renderActivation(params);
+    const users = await db.getAll('usuarios');
+    if (!users.length) return renderActivation({ code: '', endpoint: '' });
+    renderLogin();
   } catch (error) {
-    app.innerHTML = `<div class="login-wrap"><div class="login-card"><h1>No se pudo iniciar</h1><p>${esc(error.message)}</p></div></div>`;
+    app.innerHTML = `<div class="login-wrap"><section class="login-card"><h1>No se pudo iniciar</h1><p>${esc(error.message)}</p></section></div>`;
   }
 }
 
-boot();
+window.addEventListener('online', () => { if (currentUser) toast('Conexión recuperada.'); });
+window.addEventListener('offline', () => { if (currentUser) toast('Sin conexión. Tus registros seguirán guardándose localmente.'); });
+
+start();
