@@ -16,16 +16,19 @@ const files = [
   'styles-mobile-fenologia.css',
   'styles-summary-mobile.css',
   'styles-map-labels.css',
+  'styles-login.css',
   'manifest.webmanifest',
   'sw.js',
   'js/app.js',
   'js/db.js',
   'js/sync.js',
   'js/qr.js',
+  'js/login-enhance.js',
   'js/supervision-safe.js',
   'js/map-labels.js',
   'js/version-ui.js',
-  'icons/icon.svg'
+  'icons/icon.svg',
+  'assets/login-farm.svg'
 ];
 
 for (const relative of files) {
@@ -114,4 +117,5 @@ fs.writeFileSync(path.join(out, '.nojekyll'), '');
 console.log(`Sitio preparado en ${out}`);
 console.log(`Catálogo fitosanitario: ${catalog.length} lotes copiados de Fenología`);
 console.log(`Mapa fitosanitario: ${features.length}/${catalog.length} lotes con geometría validada`);
+console.log('Acceso responsive: fondo y cortes 900/760/420 copiados del patrón visual de Fenología');
 console.log(`Archivos públicos: ${files.length + 4}`);

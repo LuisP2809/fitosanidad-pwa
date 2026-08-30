@@ -3,9 +3,9 @@ import path from 'node:path';
 
 const root = process.cwd();
 const required = [
-  'index.html','styles.css','styles-supervision.css','styles-mobile-fenologia.css','styles-summary-mobile.css','styles-map-labels.css','manifest.webmanifest','sw.js',
-  'js/app.js','js/db.js','js/sync.js','js/qr.js','js/supervision-safe.js','js/map-labels.js','js/version-ui.js',
-  'data/catalogo-fenologia.json','apps-script/Code.gs','scripts/prepare-web.mjs'
+  'index.html','styles.css','styles-supervision.css','styles-mobile-fenologia.css','styles-summary-mobile.css','styles-map-labels.css','styles-login.css','manifest.webmanifest','sw.js',
+  'js/app.js','js/db.js','js/sync.js','js/qr.js','js/login-enhance.js','js/supervision-safe.js','js/map-labels.js','js/version-ui.js',
+  'assets/login-farm.svg','data/catalogo-fenologia.json','apps-script/Code.gs','scripts/prepare-web.mjs'
 ];
 for (const file of required) {
   if (!fs.existsSync(path.join(root, file))) throw new Error(`Falta ${file}`);
@@ -42,6 +42,7 @@ const app = read('js/app.js');
 const sync = read('js/sync.js');
 const backend = read('apps-script/Code.gs');
 const sw = read('sw.js');
+const loginEnhance = read('js/login-enhance.js');
 const supervision = read('js/supervision-safe.js');
 const mapLabels = read('js/map-labels.js');
 const versionUi = read('js/version-ui.js');
@@ -52,6 +53,8 @@ const supervisionStyles = read('styles-supervision.css');
 const mobileStyles = read('styles-mobile-fenologia.css');
 const summaryMobileStyles = read('styles-summary-mobile.css');
 const mapLabelStyles = read('styles-map-labels.css');
+const loginStyles = read('styles-login.css');
+const loginFarm = read('assets/login-farm.svg');
 
 if (!app.includes('diasRevision: 7')) throw new Error('Días de revisión no está fijado en 7.');
 if (app.includes('Turno detectado')) throw new Error('Turno detectado volvió a aparecer en la interfaz.');
@@ -59,10 +62,13 @@ if (!app.includes('Activar dispositivo') || !app.includes('qrSvg')) throw new Er
 if (!sync.includes("'redeemActivation'") || !sync.includes("'createActivation'")) throw new Error('Faltan endpoints de activación en el cliente.');
 if (!backend.includes('issueActivation_') || !backend.includes('redeemActivationAction_')) throw new Error('Falta activación temporal en Apps Script.');
 if (!backend.includes('USER_DISABLED')) throw new Error('Falta revocación central de usuarios.');
-if (!sw.includes("fitosanidad-0.5.3") || !sw.includes('styles-summary-mobile.css') || !sw.includes('styles-map-labels.css') || !sw.includes('js/map-labels.js') || !sw.includes('js/version-ui.js')) throw new Error('La caché PWA no apunta a la versión 0.5.3 completa.');
+if (!sw.includes("fitosanidad-0.5.4") || !sw.includes('styles-login.css') || !sw.includes('js/login-enhance.js') || !sw.includes('assets/login-farm.svg') || !sw.includes('styles-map-labels.css') || !sw.includes('js/map-labels.js') || !sw.includes('js/version-ui.js')) throw new Error('La caché PWA no apunta a la versión 0.5.4 completa.');
 if (!sw.includes("event.request.mode === 'navigate'")) throw new Error('La navegación debe priorizar red para evitar una interfaz antigua en caché.');
-if (!index.includes('styles-summary-mobile.css?v=0.5.3') || !index.includes('styles-map-labels.css?v=0.5.3') || !index.includes('js/supervision-safe.js?v=0.5.3') || !index.includes('js/map-labels.js?v=0.5.3') || !index.includes('js/version-ui.js?v=0.5.3') || !index.includes('#063b25')) throw new Error('Los assets o el tema visual no apuntan a v0.5.3.');
-if (!versionUi.includes("APP_VERSION = '0.5.3'") || !versionUi.includes('MutationObserver')) throw new Error('Falta la fuente central de versión visible 0.5.3.');
+if (!index.includes('styles-login.css?v=0.5.4') || !index.includes('js/login-enhance.js?v=0.5.4') || !index.includes('js/map-labels.js?v=0.5.4') || !index.includes('js/version-ui.js?v=0.5.4') || !index.includes('#063b25')) throw new Error('Los assets o el tema visual no apuntan a v0.5.4.');
+if (!versionUi.includes("APP_VERSION = '0.5.4'") || !versionUi.includes('MutationObserver')) throw new Error('Falta la fuente central de versión visible 0.5.4.');
+if (!loginEnhance.includes("import { APP_VERSION } from './version-ui.js'") || !loginEnhance.includes('beforeinstallprompt') || !loginEnhance.includes('fit-login-brand') || !loginEnhance.includes('fitConfiguredDevice') || !loginEnhance.includes('Ingresar al sistema')) throw new Error('Falta la mejora funcional de la pantalla de acceso.');
+if (!loginStyles.includes('ACCESO RESPONSIVE 0.5.4') || !loginStyles.includes('@media(max-width:900px)') || !loginStyles.includes('@media(max-width:760px)') || !loginStyles.includes('@media(max-width:420px)') || !loginStyles.includes('assets/login-farm.svg') || !loginStyles.includes('.fit-install-card')) throw new Error('Faltan los parámetros responsive de Fenología adaptados al login.');
+if (!loginFarm.includes('Paisaje agrícola') || !loginFarm.includes('viewBox="0 0 1600 1000"')) throw new Error('Falta el fondo agrícola local del acceso.');
 if (!supervision.includes('Mapa y dashboard fitosanitario') || !supervision.includes('getCentralSnapshot')) throw new Error('Falta el dashboard central.');
 if (!supervision.includes('no representa un umbral fitosanitario')) throw new Error('Falta aclaración de escala relativa del mapa.');
 if (!supervision.includes("observer.observe(root,{childList:true})")) throw new Error('El observador seguro debe limitarse a cambios directos del contenedor principal.');
@@ -76,18 +82,19 @@ if (!supervisionStyles.includes('touch-action:none') || !supervisionStyles.inclu
 if (!mobileStyles.includes('@media (max-width:420px)') || !mobileStyles.includes('.sup-map-zoom')) throw new Error('Falta la escala móvil general inspirada en Fenología.');
 if (!summaryMobileStyles.includes('RESUMEN MOVIL 0.5.2') || !summaryMobileStyles.includes('(pointer:coarse)') || !summaryMobileStyles.includes('.sup-filter-grid') || !summaryMobileStyles.includes('.sup-kpis') || !summaryMobileStyles.includes('.sup-map-zoom')) throw new Error('Falta la corrección móvil dedicada del Resumen.');
 if (!mapLabelStyles.includes('.sup-lot-label') || !mapLabelStyles.includes('.sup-map-popup') || !mapLabelStyles.includes('selected-label')) throw new Error('Falta el estilo de etiquetas o globo rápido del mapa.');
-if (!prepare.includes('styles-summary-mobile.css') || !prepare.includes('styles-map-labels.css') || !prepare.includes('js/map-labels.js') || !prepare.includes('catalogo-fenologia.json') || !prepare.includes('catalog.length !== 254') || !prepare.includes('fenologia-pwa') || !prepare.includes('js/version-ui.js')) throw new Error('Falta publicar las mejoras del mapa o construir catálogo/mapa.');
+if (!prepare.includes('styles-login.css') || !prepare.includes('js/login-enhance.js') || !prepare.includes('assets/login-farm.svg') || !prepare.includes('catalogo-fenologia.json') || !prepare.includes('catalog.length !== 254') || !prepare.includes('fenologia-pwa') || !prepare.includes('js/version-ui.js')) throw new Error('Falta publicar la nueva pantalla de acceso o construir catálogo/mapa.');
 
 const allText = required.map(read).join('\n');
 if (/AIza[0-9A-Za-z_-]{20,}|script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}/.test(allText)) throw new Error('Se detectó un secreto o URL real de implementación dentro del repositorio.');
 
-console.log('OK · Fitosanidad PWA 0.5.3');
+console.log('OK · Fitosanidad PWA 0.5.4');
 console.log(`Catálogo maestro de Fenología: ${catalog.length} lotes`);
 console.log('Fórmulas verificadas: Bicho, Mosca, SENASA');
 console.log('Activación simplificada: verificada');
+console.log('Acceso responsive PC/móvil: cortes 900/760/420 y fondo agrícola verificados');
+console.log('Instalación PWA desde login y dispositivo configurado: verificados');
 console.log('Dashboard central y mapa fitosanitario: verificados');
 console.log('Resumen móvil: escala amplia, filtros, KPIs, gráficos y mapa verificados');
 console.log('Mapa: etiquetas de lote, selección y globo rápido verificados');
-console.log('Mapa móvil: controles − / Ajustar / +, arrastre y zoom verificados');
-console.log('Versión visible: fuente central 0.5.3 verificada');
+console.log('Versión visible: fuente central 0.5.4 verificada');
 console.log('Rendimiento: observadores seguros y navegación con caché actualizable');

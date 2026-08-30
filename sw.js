@@ -1,4 +1,4 @@
-const VERSION = 'fitosanidad-0.5.3';
+const VERSION = 'fitosanidad-0.5.4';
 const CORE = [
   './',
   './index.html',
@@ -7,12 +7,15 @@ const CORE = [
   './styles-mobile-fenologia.css',
   './styles-summary-mobile.css',
   './styles-map-labels.css',
+  './styles-login.css',
   './manifest.webmanifest',
   './icons/icon.svg',
+  './assets/login-farm.svg',
   './js/app.js',
   './js/db.js',
   './js/sync.js',
   './js/qr.js',
+  './js/login-enhance.js',
   './js/supervision-safe.js',
   './js/map-labels.js',
   './js/version-ui.js',
