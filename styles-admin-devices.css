@@ -1,0 +1,19 @@
+.admin-device-panel{margin-top:18px}
+.admin-device-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:16px}
+.admin-device-head h3{margin:4px 0 5px;font-size:21px;color:var(--g950)}
+.admin-device-head p{margin:0;max-width:720px;color:var(--muted);font-size:12px;line-height:1.5}
+.admin-device-eyebrow{font-size:10px;letter-spacing:.13em;font-weight:900;color:var(--g700)}
+.admin-device-list{display:grid;gap:9px;margin-top:14px}
+.admin-device-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 13px;border:1px solid var(--line);border-radius:14px;background:#fbfdfb}
+.admin-device-row.revoked{opacity:.72;background:#f7f7f7}
+.admin-device-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:var(--g100);font-size:20px}
+.admin-device-copy{display:grid;min-width:0;gap:2px}.admin-device-copy b{color:var(--g950);font-size:13px}.admin-device-copy small{color:#708079;font-size:10px;overflow:hidden;text-overflow:ellipsis}.admin-device-copy span{color:var(--muted);font-size:10px}
+.admin-device-state{display:grid;justify-items:end;gap:6px}.admin-device-state small{font-size:9px;color:var(--g700);font-weight:850}
+.admin-device-activation{display:grid;grid-template-columns:190px minmax(0,1fr);gap:18px;align-items:center;margin:14px 0;padding:15px;border:1px solid #cfe3d5;border-radius:16px;background:#f5faf6}
+.admin-device-qr{padding:10px;border:1px solid var(--line);border-radius:13px;background:#fff}.admin-device-qr svg{width:100%;height:auto;display:block}
+.admin-device-activation strong{display:block;margin:4px 0 6px;color:var(--g900);font-size:29px;letter-spacing:.1em}.admin-device-activation p{margin:0 0 5px;color:#53665c;font-size:12px;line-height:1.45}.admin-device-activation small{color:var(--muted);font-size:10px}.admin-device-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+@media(max-width:760px){
+  .admin-device-head{flex-direction:column}.admin-device-head .btn{width:100%}
+  .admin-device-activation{grid-template-columns:1fr}.admin-device-qr{width:min(230px,100%);margin:auto}.admin-device-activation>div:last-of-type{text-align:center}.admin-device-actions{justify-content:center}
+  .admin-device-row{grid-template-columns:auto minmax(0,1fr)}.admin-device-state{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-end;gap:8px}.admin-device-state .btn{min-height:38px}
+}
