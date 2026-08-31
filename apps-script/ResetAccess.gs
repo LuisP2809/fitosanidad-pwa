@@ -1,4 +1,4 @@
-/* Recuperación de accesos para Fitosanidad PWA.
+/* Recuperación de accesos para Fitosanidad PWA 0.6.0.
  * Uso manual desde Google Apps Script.
  * NO borra evaluaciones ni modifica las hojas oficiales.
  */
@@ -11,13 +11,22 @@ function resetAllAccessAndProvisionAdmin() {
   try {
     const ss = spreadsheet_();
     const usersSheet = ensureControlSheet_(ss, 'USUARIOS_SYNC', USER_HEADERS);
+    const devicesSheet = ensureControlSheet_(ss, 'DISPOSITIVOS_SYNC', DEVICE_HEADERS);
     const previousUsers = listUsers_();
+    const previousDevices = listDeviceCredentials_();
     const revokedCount = previousUsers.length;
+    const revokedDevices = previousDevices.length;
 
     // Revoca todos los perfiles centrales conservando cabeceras/formato.
-    const lastRow = usersSheet.getLastRow();
-    if (lastRow > 1) {
-      usersSheet.getRange(2, 1, lastRow - 1, USER_HEADERS.length).clearContent();
+    const lastUserRow = usersSheet.getLastRow();
+    if (lastUserRow > 1) {
+      usersSheet.getRange(2, 1, lastUserRow - 1, USER_HEADERS.length).clearContent();
+    }
+
+    // En 0.6.0 las credenciales son independientes por dispositivo.
+    const lastDeviceRow = devicesSheet.getLastRow();
+    if (lastDeviceRow > 1) {
+      devicesSheet.getRange(2, 1, lastDeviceRow - 1, DEVICE_HEADERS.length).clearContent();
     }
 
     // Invalida todos los códigos QR/códigos temporales todavía pendientes.
@@ -28,7 +37,7 @@ function resetAllAccessAndProvisionAdmin() {
       'SYSTEM_RESET',
       '',
       'SECURITY',
-      revokedCount + ' usuario(s) y ' + activationsRevoked + ' activación(es) revocados. Evaluaciones conservadas.'
+      revokedCount + ' usuario(s), ' + revokedDevices + ' dispositivo(s) y ' + activationsRevoked + ' activación(es) revocados. Evaluaciones conservadas.'
     );
 
     // Crea de cero al Administrador principal.
@@ -39,9 +48,10 @@ function resetAllAccessAndProvisionAdmin() {
       role: 'ADMIN'
     });
 
-    const activation = issueActivation_('ADM-001', 'SYSTEM_RESET');
+    const activation = issueActivation_('ADM-001', 'SYSTEM_RESET', 'ADMIN_RECOVERY');
     const result = adminRecoveryResult_(activation, {
       revokedUsers: revokedCount,
+      revokedDevices: revokedDevices,
       revokedActivations: activationsRevoked,
       message: 'Accesos reiniciados. Usa el código temporal para volver a activar el Administrador principal.'
     });
@@ -54,8 +64,8 @@ function resetAllAccessAndProvisionAdmin() {
 }
 
 /*
- * Genera OTRO código para ADM-001 sin volver a borrar usuarios ni evaluaciones.
- * Úsalo si el código anterior venció, fue consumido o la activación local no terminó.
+ * Genera OTRO código para ADM-001 sin volver a borrar usuarios, dispositivos
+ * ni evaluaciones. En 0.6.0 este código agrega otro dispositivo al mismo Admin.
  */
 function generateFreshAdminActivation() {
   setupFitosanidad();
@@ -75,21 +85,23 @@ function generateFreshAdminActivation() {
     }
 
     // Elimina únicamente códigos pendientes asociados al Administrador.
+    // Los dispositivos ya vinculados permanecen activos.
     const revokedActivations = revokeActivationsForUser_('ADM-001');
-    const activation = issueActivation_('ADM-001', 'ADMIN_RECOVERY');
+    const activation = issueActivation_('ADM-001', 'ADMIN_RECOVERY', 'ADMIN_MULTI_DEVICE');
 
     audit_(
       'ADMIN_RECOVERY_CODE',
       'ADMIN_RECOVERY',
       'ADM-001',
       'ADMIN',
-      'Nuevo código temporal generado; ' + revokedActivations + ' código(s) anterior(es) revocados.'
+      'Nuevo código temporal multidispositivo; ' + revokedActivations + ' código(s) anterior(es) revocados.'
     );
 
     const result = adminRecoveryResult_(activation, {
       revokedUsers: 0,
+      revokedDevices: 0,
       revokedActivations: revokedActivations,
-      message: 'Nuevo código de recuperación generado. No reinicia usuarios ni evaluaciones.'
+      message: 'Nuevo acceso para ADM-001 generado. No revoca dispositivos ya vinculados ni evaluaciones.'
     });
 
     console.log('ADMIN_RECOVERY=' + JSON.stringify(result));
@@ -100,9 +112,7 @@ function generateFreshAdminActivation() {
 }
 
 /*
- * Devuelve un diagnóstico SIN tokens ni códigos. Sirve para comprobar que
- * el Administrador existe y cuántas activaciones pendientes hay en ESTE
- * proyecto de Apps Script.
+ * Devuelve un diagnóstico SIN tokens ni códigos.
  */
 function checkAdminRecoveryStatus() {
   setupFitosanidad();
@@ -120,11 +130,18 @@ function checkAdminRecoveryStatus() {
     } catch (error) {}
   });
 
+  const adminDevices = listDeviceCredentials_().filter(function(item) {
+    return item.userId === 'ADM-001';
+  });
+
   const result = {
     ok: true,
+    version: FITO_VERSION,
     adminExists: !!admin,
     adminActive: !!(admin && admin.active),
     adminRole: admin ? admin.role : '',
+    activeAdminDevices: adminDevices.filter(function(item) { return item.active; }).length,
+    totalAdminDevices: adminDevices.length,
     pendingAdminActivations: pendingAdminActivations,
     spreadsheetConfigured: !!PropertiesService.getScriptProperties().getProperty(SPREADSHEET_ID_PROPERTY)
   };
@@ -162,9 +179,11 @@ function revokeActivationsForUser_(userId) {
 function adminRecoveryResult_(activation, extra) {
   return {
     ok: true,
+    version: FITO_VERSION,
     adminId: 'ADM-001',
     username: 'admin',
     revokedUsers: Number(extra.revokedUsers || 0),
+    revokedDevices: Number(extra.revokedDevices || 0),
     revokedActivations: Number(extra.revokedActivations || 0),
     activationCode: activation.code,
     expiresAt: activation.expiresAt,
