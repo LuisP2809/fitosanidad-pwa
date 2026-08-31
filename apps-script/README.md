@@ -1,61 +1,36 @@
-# Servicio central Fitosanidad 0.3.0
+# Servicio central Fitosanidad 0.6.0
 
-El backend conserva las tres plantillas de evaluación, la autorización central por dispositivo y añade activación simplificada mediante **QR/enlace + código temporal de un solo uso**.
+La versión 0.6.0 añade credenciales independientes por dispositivo. Un mismo usuario puede permanecer vinculado en varios equipos sin que una nueva activación invalide automáticamente los anteriores. El caso principal es `ADM-001`, que puede usarse en PC y celular al mismo tiempo.
 
-Los tokens de dispositivo nunca se guardan en texto plano en Google Sheets: solo se almacena su SHA-256. Los códigos temporales se guardan en Script Properties, vencen en 24 horas y se eliminan cuando se usan o expiran.
+## Actualización desde 0.5.x
 
-## Actualización desde 0.2.0
+1. Reemplaza `Code.gs` por la versión 0.6.0 del repositorio.
+2. Ejecuta `setupFitosanidad()` una vez. Reutiliza `BD_FITOSANIDAD`; no borra evaluaciones ni usuarios.
+3. Edita la implementación web existente en **Implementar → Administrar implementaciones**, selecciona **Nueva versión** y vuelve a implementar.
+4. Conserva la misma URL `/exec`.
+5. No vuelvas a crear `ADM-001` si ya existe.
 
-1. Reemplaza todo el contenido de `Code.gs` por la versión actual del repositorio.
-2. Ejecuta `setupFitosanidad()` una vez. Reutiliza `BD_FITOSANIDAD`; no borra registros ni usuarios existentes.
-3. No vuelvas a ejecutar `provisionInitialAdmin()` si `ADM-001` ya existe.
-4. Ve a **Implementar → Administrar implementaciones**.
-5. Edita la implementación web existente, selecciona **Nueva versión** y vuelve a implementar como propietario, con el mismo nivel de acceso.
-6. Mantén la misma URL `/exec`; los dispositivos ya instalados continúan funcionando.
+En la primera validación desde un dispositivo que ya funcionaba con 0.5.x, el backend acepta la credencial anterior y registra ese equipo en `DISPOSITIVOS_SYNC`. Después, cada activación nueva genera una credencial propia para el dispositivo que consume el código.
 
-## Activación de Evaluadores y Supervisores
+## Dispositivos del Administrador
 
-Desde la PWA, el Administrador crea un usuario o pulsa **Nuevo acceso**. El servidor devuelve un código temporal y la PWA genera localmente:
+Desde **Admin → Dispositivos del Administrador** se puede generar un QR/código para otro equipo. El nuevo dispositivo crea su PIN local y queda asociado al mismo `ADM-001`; la PC o celular anterior permanece activo. También se pueden revocar o reactivar dispositivos individualmente. Por seguridad, la PWA no permite revocar desde la interfaz el dispositivo que se está usando en ese momento.
 
-- QR de activación.
-- Enlace de activación.
-- Código visible de 8 caracteres.
-
-El usuario escanea el QR o abre el enlace, crea su PIN local y queda vinculado. Al consumir un nuevo código, el token anterior de ese usuario queda invalidado. Después de la activación, el ingreso cotidiano es solo **Usuario + PIN**.
-
-## Estructura central
+## Hojas centrales
 
 - `BICHO DEL CESTO`
 - `MOSCA DE LA FRUTA`
 - `TRAMPAS OFICIALES DE SENASA`
 - `USUARIOS_SYNC`
+- `DISPOSITIVOS_SYNC`
 - `AUDITORIA`
 
-Las primeras 12 columnas de cada evaluación conservan la plantilla original. Las columnas técnicas quedan ocultas y guardan ID idempotente, usuario, hora y GPS.
+Las primeras 12 columnas de cada evaluación conservan las plantillas oficiales. Los tokens nunca se guardan en texto plano; solo se almacena su hash SHA-256.
 
-## Administrador inicial
+## Recuperación
 
-`provisionInitialAdmin()` se usa únicamente en una instalación nueva. Si solo necesitas renovar el token del Administrador principal, usa `rotateInitialAdminToken()`.
-
-### Reinicio total de accesos
-
-El archivo `ResetAccess.gs` contiene la función manual `resetAllAccessAndProvisionAdmin()` para una recuperación completa de permisos. Esta función:
-
-- Revoca todos los usuarios y tokens centrales de `USUARIOS_SYNC`.
-- Invalida todos los códigos temporales/QR pendientes.
-- Conserva intactas las evaluaciones de Bicho, Mosca y SENASA.
-- Conserva `AUDITORIA` y registra el reinicio de seguridad.
-- Crea nuevamente `ADM-001` / usuario `admin`.
-- Genera un código temporal de un solo uso para volver a activar al Administrador principal.
-
-Para usarla, crea en el mismo proyecto de Apps Script un archivo de script llamado `ResetAccess.gs`, copia allí el contenido del archivo homónimo del repositorio y ejecuta `resetAllAccessAndProvisionAdmin()` una sola vez. Revisa el registro de ejecución para obtener `activationCode`; no compartas ese código ni el perfil generado en chats o repositorios.
-
-Después abre Fitosanidad, pulsa **Activar otro dispositivo**, usa el código generado y la misma URL `/exec`, y crea un PIN nuevo para el Administrador. Los Evaluadores y Supervisores anteriores quedarán revocados y deberán crearse nuevamente desde Admin.
+`ResetAccess.gs` conserva las evaluaciones. El reinicio total de accesos limpia usuarios, dispositivos y códigos temporales y vuelve a crear `ADM-001`. Si el Administrador ya existe y solo necesita otro código, usa la función de recuperación correspondiente sin borrar nuevamente los usuarios.
 
 ## Seguridad
 
-- No compartas la hoja `USUARIOS_SYNC` con Evaluadores.
-- No pegues perfiles/tokens en GitHub ni en mensajes.
-- Los QR/códigos de activación deben entregarse solo al usuario correspondiente.
-- Los códigos vencen automáticamente y son de un solo uso.
-- La app puede seguir capturando offline; una revocación se aplica cuando el dispositivo vuelve a contactar al servidor.
+No compartas `USUARIOS_SYNC` ni `DISPOSITIVOS_SYNC` con Evaluadores. No publiques tokens, códigos temporales o URLs privadas de implementación. Las revocaciones se aplican cuando el dispositivo vuelve a contactar al servidor.
