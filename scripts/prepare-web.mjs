@@ -17,6 +17,8 @@ const files = [
   'styles-summary-mobile.css',
   'styles-map-labels.css',
   'styles-login.css',
+  'styles-desktop-fenologia.css',
+  'styles-admin-devices.css',
   'manifest.webmanifest',
   'sw.js',
   'js/app.js',
@@ -24,6 +26,8 @@ const files = [
   'js/sync.js',
   'js/qr.js',
   'js/login-enhance.js',
+  'js/desktop-shell.js',
+  'js/admin-devices.js',
   'js/supervision-safe.js',
   'js/map-labels.js',
   'js/version-ui.js',
@@ -118,4 +122,6 @@ console.log(`Sitio preparado en ${out}`);
 console.log(`Catálogo fitosanitario: ${catalog.length} lotes copiados de Fenología`);
 console.log(`Mapa fitosanitario: ${features.length}/${catalog.length} lotes con geometría validada`);
 console.log('Acceso responsive: fondo y cortes 900/760/420 copiados del patrón visual de Fenología');
+console.log('Escritorio 0.6.0: navegación lateral 244px y área de trabajo completa');
+console.log('Administrador 0.6.0: panel multidispositivo incluido');
 console.log(`Archivos públicos: ${files.length + 4}`);
