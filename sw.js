@@ -1,6 +1,6 @@
-const VERSION = 'fitosanidad-0.6.1';
+const VERSION = 'fitosanidad-0.6.2';
 const CORE = [
-  './','./index.html','./styles.css','./styles-supervision.css','./styles-mobile-fenologia.css','./styles-summary-mobile.css','./styles-map-labels.css','./styles-login.css','./styles-desktop-fenologia.css','./styles-admin-devices.css',
+  './','./index.html','./styles.css','./styles-supervision.css','./styles-mobile-fenologia.css','./styles-summary-mobile.css','./styles-map-labels.css','./styles-login.css','./styles-desktop-fenologia.css','./styles-admin-devices.css','./styles-sync-status.css',
   './manifest.webmanifest','./icons/icon.svg','./assets/login-farm.svg',
   './js/performance-cache.js','./js/app.js','./js/db.js','./js/sync.js','./js/qr.js','./js/login-enhance.js','./js/desktop-shell.js','./js/admin-devices.js','./js/supervision-safe.js','./js/map-labels.js','./js/version-ui.js',
   './vendor/qrcode.mjs','./data/catalogo-lotes.json','./data/lotes-mapa.geojson'
