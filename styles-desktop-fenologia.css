@@ -1,0 +1,111 @@
+/* Fitosanidad 0.6.0 · escritorio inspirado en la estructura responsive de Fenología. */
+.fit-nav-icon,.fit-nav-label{display:inline-block}
+.fit-side-footer{display:none}
+
+@media (min-width:761px){
+  html,body{min-width:0;background:#f5f8f5}
+  .app-shell.fit-workspace{
+    width:100%;
+    max-width:none;
+    margin:0;
+    min-height:100vh;
+    padding-bottom:0;
+    display:grid;
+    grid-template-columns:244px minmax(0,1fr);
+    grid-template-rows:76px minmax(calc(100vh - 76px),auto);
+    align-items:start;
+  }
+  .app-shell.fit-workspace>.topbar{
+    grid-column:1/-1;
+    grid-row:1;
+    position:sticky;
+    top:0;
+    z-index:40;
+    width:100%;
+    height:76px;
+    min-height:76px;
+    padding:0 24px;
+    border-radius:0;
+  }
+  .app-shell.fit-workspace>.page{
+    grid-column:2;
+    grid-row:2;
+    width:100%;
+    max-width:none;
+    min-width:0;
+    padding:30px clamp(20px,4vw,56px) 60px;
+  }
+  .app-shell.fit-workspace>.nav.fit-sidebar{
+    grid-column:1;
+    grid-row:2;
+    position:sticky;
+    top:76px;
+    left:auto;
+    right:auto;
+    bottom:auto;
+    transform:none;
+    align-self:start;
+    width:244px;
+    height:calc(100vh - 76px);
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    padding:20px 15px;
+    overflow:auto;
+    border:0;
+    border-right:1px solid var(--line);
+    background:#fff;
+    box-shadow:none;
+    backdrop-filter:none;
+  }
+  .nav.fit-sidebar button{
+    width:100%;
+    min-height:45px;
+    display:grid;
+    grid-template-columns:30px minmax(0,1fr);
+    align-items:center;
+    gap:10px;
+    padding:11px 12px;
+    border-radius:11px;
+    text-align:left;
+    color:#557066;
+    font-size:13px;
+    font-weight:750;
+  }
+  .nav.fit-sidebar button:hover{background:#f2f8f4;color:var(--g900)}
+  .nav.fit-sidebar button.active{background:var(--g100);color:var(--g900)}
+  .fit-nav-icon{width:28px;text-align:center;font-size:18px;line-height:1}
+  .fit-nav-label{font-size:13px;line-height:1.2}
+  .fit-side-footer{
+    display:grid;
+    gap:3px;
+    margin-top:auto;
+    padding:16px 10px 4px;
+    border-top:1px solid var(--line);
+    color:#607168;
+  }
+  .fit-side-footer b{font-size:12px;color:var(--g950)}
+  .fit-side-footer small{font-size:11px}
+  .fit-side-footer span{font-size:10px;color:#8a9991}
+
+  .page>.hero{padding:26px 28px;border-radius:20px}
+  .page>.grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+  .page>.admin-grid{grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr);gap:18px}
+  .form-card{max-width:980px}
+  .page .card{box-shadow:0 12px 35px rgba(18,74,42,.075)}
+  .sup-dashboard{width:100%;max-width:none}
+  .sup-map-layout{grid-template-columns:minmax(0,1fr) 330px}
+  .sup-map-canvas,.sup-map-canvas svg{min-height:600px}
+}
+
+@media (min-width:1280px){
+  .app-shell.fit-workspace>.page{padding-left:48px;padding-right:48px}
+  .sup-filter-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .sup-chart-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+@media (max-width:760px){
+  .fit-side-footer{display:none!important}
+  .nav.fit-sidebar .fit-nav-icon{display:block;font-size:20px;line-height:1.1}
+  .nav.fit-sidebar .fit-nav-label{display:block;margin-top:3px;font-size:11px;line-height:1.05}
+}
