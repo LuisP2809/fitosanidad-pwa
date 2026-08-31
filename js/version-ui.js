@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.6.1';
+export const APP_VERSION = '0.6.2';
 const versionText = `v${APP_VERSION}`;
 let scheduled = false;
 function applyVersion(){const label=document.querySelector('.brand .muted');if(label&&label.textContent!==versionText)label.textContent=versionText;}
