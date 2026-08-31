@@ -12,7 +12,9 @@ import {
   getCentralSnapshot
 } from './sync.js';
 
-const VERSION = '0.3.0';
+const VERSION = '0.6.2';
+const SESSION_KEY = 'fitosanidad-session-v1';
+const AUTO_SYNC_DELAY_MS = 1200;
 const TYPES = {
   bicho: { title: 'Bicho del cesto', icon: '🐛', captureLabel: 'Capturas', indicator: 'C/T/D' },
   mosca: { title: 'Mosca de la fruta', icon: '🪰', captureLabel: 'Moscas capturadas', indicator: 'MTD' },
@@ -24,6 +26,9 @@ let currentUser = null;
 let currentView = 'home';
 let centralUsersCache = [];
 let centralSnapshotCache = [];
+let pendingCount = 0;
+let syncBusy = false;
+let autoSyncTimer = null;
 
 const app = document.querySelector('#app');
 const toastEl = document.querySelector('#toast');
@@ -103,6 +108,109 @@ function buildActivationLink(activation) {
   return url.toString();
 }
 
+function readSession() {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
+    if (!parsed?.userId) return null;
+    const allowedViews = ['home','records','summary','admin','sync'];
+    return {
+      userId: String(parsed.userId).toUpperCase(),
+      view: allowedViews.includes(parsed.view) ? parsed.view : 'home'
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(view = currentView) {
+  if (!currentUser?.id) return;
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ userId: currentUser.id, view, at: Date.now() }));
+  } catch {}
+}
+
+function clearSession() {
+  try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+}
+
+function setView(view) {
+  currentView = view;
+  saveSession(view);
+}
+
+async function getPendingRows() {
+  if (!currentUser) return [];
+  const rows = await db.getAll('evaluaciones');
+  return rows.filter((row) => row.evaluadorId === currentUser.id && row.syncStatus !== 'confirmed');
+}
+
+async function refreshSyncIndicator(state = 'idle') {
+  if (!currentUser) return 0;
+  const pending = await getPendingRows();
+  pendingCount = pending.length;
+  const chip = document.querySelector('#syncStatusChip');
+  if (!chip) return pendingCount;
+
+  chip.classList.remove('syncing','has-pending','all-synced','offline-state','sync-error');
+  if (state === 'syncing') {
+    chip.classList.add('syncing');
+    chip.textContent = `☁ Sincronizando ${pendingCount || ''}${pendingCount === 1 ? ' registro' : ' registros'}…`;
+  } else if (!navigator.onLine && pendingCount) {
+    chip.classList.add('offline-state','has-pending');
+    chip.textContent = `⏳ ${pendingCount} ${pendingCount === 1 ? 'pendiente' : 'pendientes'}`;
+  } else if (state === 'error' && pendingCount) {
+    chip.classList.add('sync-error','has-pending');
+    chip.textContent = `⚠ ${pendingCount} ${pendingCount === 1 ? 'pendiente' : 'pendientes'}`;
+  } else if (pendingCount) {
+    chip.classList.add('has-pending');
+    chip.textContent = `⏳ ${pendingCount} ${pendingCount === 1 ? 'pendiente' : 'pendientes'}`;
+  } else {
+    chip.classList.add('all-synced');
+    chip.textContent = '✓ Todo sincronizado';
+  }
+  chip.title = pendingCount ? 'Hay evaluaciones guardadas localmente pendientes de confirmación central.' : 'No hay evaluaciones pendientes de sincronizar.';
+  return pendingCount;
+}
+
+function scheduleAutoSync(reason = 'online', delay = AUTO_SYNC_DELAY_MS) {
+  clearTimeout(autoSyncTimer);
+  if (!currentUser || !navigator.onLine || !currentUser.syncEndpoint) {
+    refreshSyncIndicator().catch(() => {});
+    return;
+  }
+  autoSyncTimer = setTimeout(() => autoSync(reason), delay);
+}
+
+async function autoSync(reason = 'auto') {
+  if (syncBusy || !currentUser || !navigator.onLine || !currentUser.syncEndpoint) return;
+  const before = await getPendingRows();
+  pendingCount = before.length;
+  if (!before.length) {
+    await refreshSyncIndicator();
+    return;
+  }
+
+  syncBusy = true;
+  await refreshSyncIndicator('syncing');
+  try {
+    const result = await syncPending(currentUser);
+    const remaining = await refreshSyncIndicator();
+    if (result.confirmed > 0) {
+      toast(`✓ ${result.confirmed} ${result.confirmed === 1 ? 'registro sincronizado' : 'registros sincronizados'}.`);
+    }
+    if (remaining === 0 && currentView === 'sync') return renderSync();
+    if (currentView === 'records' && currentUser.role === 'EVALUADOR' && !document.querySelector('#evalForm')) return renderRecords();
+    if (currentView === 'summary' && currentUser.role === 'EVALUADOR') return renderSummary();
+  } catch (error) {
+    if (error.code === 'USER_DISABLED' || error.code === 'UNAUTHORIZED') return handleDisabledUser();
+    await refreshSyncIndicator('error');
+    if (reason === 'manual') toast(`No se pudo sincronizar: ${error.message}`, 4500);
+  } finally {
+    syncBusy = false;
+    refreshSyncIndicator().catch(() => {});
+  }
+}
+
 function getGps() {
   if (!navigator.geolocation) return Promise.resolve(null);
   return new Promise((resolve) => {
@@ -132,11 +240,13 @@ async function loadCatalog() {
 
 function shell(content, active = currentView) {
   const adminNav = currentUser?.role === 'ADMIN';
+  const syncTarget = adminNav ? '' : 'data-nav="sync"';
   return `
     <div class="app-shell">
       <header class="topbar">
         <div class="brand"><div class="brand-badge">F</div><div>Fitosanidad <span class="muted">v${VERSION}</span></div></div>
         <div class="top-actions">
+          <button class="sync-status-chip" id="syncStatusChip" type="button" ${syncTarget}>☁ Revisando…</button>
           <div class="status-line"><span class="dot ${navigator.onLine ? 'online':'offline'}"></span>${navigator.onLine ? 'Online':'Sin señal'}</div>
           <button class="btn ghost small" data-action="logout">Salir</button>
         </div>
@@ -199,8 +309,10 @@ function renderActivation(prefill = activationParamsFromUrl()) {
       const checked = await checkCentralAccess(user);
       currentUser = checked.localUser || user;
       history.replaceState({}, '', location.pathname);
+      setView('home');
       toast('Dispositivo activado correctamente.');
       renderHome();
+      scheduleAutoSync('activation', 500);
     } catch (error) {
       const message = error.code === 'ACTIVATION_EXPIRED'
         ? 'El código venció. Solicita uno nuevo al Administrador.'
@@ -236,18 +348,21 @@ function renderLogin() {
         currentUser = result.localUser || user;
       } catch (error) {
         if (error instanceof CentralApiError && ['USER_DISABLED','UNAUTHORIZED'].includes(error.code)) {
+          clearSession();
           return toast(error.code === 'USER_DISABLED' ? 'Tu usuario está desactivado.' : 'Este acceso ya fue reemplazado. Solicita un código nuevo.', 5000);
         }
         currentUser = user;
         toast('No se pudo validar el servidor; se habilitó el modo local.', 4500);
       }
     } else currentUser = user;
+    setView('home');
     renderHome();
+    scheduleAutoSync('login', 500);
   });
 }
 
 function renderHome() {
-  currentView = 'home';
+  setView('home');
   const canEvaluate = ['EVALUADOR','ADMIN','SUPERVISOR'].includes(currentUser.role);
   app.innerHTML = shell(`
     <section class="hero">
@@ -274,7 +389,7 @@ function options(values, placeholder) {
 function renderEvaluation(typeKey) {
   const type = TYPES[typeKey];
   if (!type) return renderHome();
-  currentView = 'home';
+  setView('home');
   app.innerHTML = shell(`
     <button class="btn ghost small" data-action="back">← Volver</button>
     <section class="card form-card" style="margin-top:12px">
@@ -353,6 +468,7 @@ function renderEvaluation(typeKey) {
     };
     await db.put('evaluaciones', record);
     let message = gps ? 'Evaluación guardada con ubicación.' : 'Evaluación guardada.';
+    await refreshSyncIndicator();
     if (navigator.onLine) {
       try {
         const result = await syncPending(currentUser);
@@ -363,6 +479,7 @@ function renderEvaluation(typeKey) {
     }
     toast(message);
     renderRecords();
+    if (navigator.onLine) scheduleAutoSync('after-save', 700);
   });
 }
 
@@ -387,7 +504,7 @@ async function recordsForView() {
 }
 
 async function renderRecords() {
-  currentView = 'records';
+  setView('records');
   const rows = await recordsForView();
   if (!currentUser) return;
   app.innerHTML = shell(`
@@ -432,7 +549,7 @@ function exportCsv(rows) {
 }
 
 async function renderSummary() {
-  currentView = 'summary';
+  setView('summary');
   const rows = await recordsForView();
   if (!currentUser) return;
   const pending = rows.filter((x) => x.syncStatus !== 'confirmed').length;
@@ -450,33 +567,30 @@ async function renderSummary() {
     <div class="section-title"><h2>${currentUser.role === 'EVALUADOR' ? 'Mi resumen':'Resumen central'}</h2></div>
     <div class="kpis"><div class="kpi"><span>Evaluaciones</span><strong>${rows.length}</strong></div><div class="kpi"><span>Lotes evaluados</span><strong>${lots}</strong></div><div class="kpi"><span>Capturas</span><strong>${captures}</strong></div><div class="kpi"><span>${currentUser.role === 'EVALUADOR' ? 'Pendientes sync':'Pendientes visibles'}</span><strong>${pending}</strong></div></div>
     <div class="grid">${perType}</div>
-    <div class="card" style="margin-top:14px"><p><strong>Indicador promedio global:</strong> ${formatIndicator(avg)}</p><p class="muted">El mapa por lote se incorporará sobre este consolidado central en la siguiente etapa.</p></div>
+    <div class="card" style="margin-top:14px"><p><strong>Indicador promedio global:</strong> ${formatIndicator(avg)}</p><p class="muted">El mapa y los gráficos usan el consolidado central confirmado.</p></div>
   `, 'summary');
   bindShell();
 }
 
 async function renderSync() {
-  currentView = 'sync';
+  setView('sync');
   const rows = await db.getAll('evaluaciones');
   const pending = rows.filter((x) => x.evaluadorId === currentUser.id && x.syncStatus !== 'confirmed').length;
   app.innerHTML = shell(`
     <div class="section-title"><h2>Sincronización</h2></div>
-    <div class="card">
+    <div class="card sync-manual-card">
       <p><strong>${pending}</strong> registros pendientes.</p>
+      <p class="muted">La app intenta enviarlos automáticamente cuando recupera internet. Este botón queda disponible como respaldo manual.</p>
       <p class="muted">Servidor central: ${currentUser.syncEndpoint ? 'configurado':'sin configurar'}.</p>
-      <button class="btn" id="syncNow" ${currentUser.syncEndpoint ? '':'disabled'}>Sincronizar ahora</button>
+      <button class="btn" id="syncNow" ${currentUser.syncEndpoint && navigator.onLine ? '':'disabled'}>${syncBusy ? 'Sincronizando…':'Sincronizar ahora'}</button>
     </div>
   `, 'sync');
   bindShell();
-  document.querySelector('#syncNow')?.addEventListener('click', async () => {
-    try {
-      const result = await syncPending(currentUser);
-      toast(`${result.confirmed} registros confirmados.`);
-      renderSync();
-    } catch (error) {
-      if (error.code === 'USER_DISABLED') return handleDisabledUser();
-      toast(`Error de sincronización: ${error.message}`, 4500);
-    }
+  document.querySelector('#syncNow')?.addEventListener('click', async (event) => {
+    if (syncBusy) return;
+    event.currentTarget.disabled = true;
+    await autoSync('manual');
+    if (currentUser) renderSync();
   });
 }
 
@@ -492,7 +606,7 @@ function activationBox(activation, title = 'Acceso temporal generado') {
         <div class="activation-info">
           <span class="muted">Código</span>
           <div class="activation-code">${esc(activation.code)}</div>
-          <p class="note">Vence: ${esc(formatExpiry(activation.expiresAt))}. Al usarse, invalida el acceso anterior de ese usuario.</p>
+          <p class="note">Vence: ${esc(formatExpiry(activation.expiresAt))}. El código solo puede usarse una vez.</p>
           <div class="activation-actions">
             <button class="btn secondary" id="copyActivationLink">Copiar enlace</button>
             <button class="btn" id="shareActivation">Compartir</button>
@@ -505,7 +619,7 @@ function activationBox(activation, title = 'Acceso temporal generado') {
 
 async function renderAdmin(activation = null, activationTitle = '') {
   if (currentUser.role !== 'ADMIN') return renderHome();
-  currentView = 'admin';
+  setView('admin');
   let users = centralUsersCache;
   let loadError = '';
   if (navigator.onLine) {
@@ -599,22 +713,68 @@ async function renderAdmin(activation = null, activationTitle = '') {
 }
 
 function bindShell() {
-  document.querySelector('[data-action="logout"]')?.addEventListener('click', () => { currentUser = null; renderLogin(); });
+  document.querySelector('[data-action="logout"]')?.addEventListener('click', () => {
+    clearTimeout(autoSyncTimer);
+    currentUser = null;
+    pendingCount = 0;
+    clearSession();
+    renderLogin();
+  });
   document.querySelectorAll('[data-nav]').forEach((button) => button.addEventListener('click', () => navigate(button.dataset.nav)));
+  refreshSyncIndicator(syncBusy ? 'syncing' : 'idle').catch(() => {});
 }
 
 function navigate(view) {
+  if (!currentUser) return renderLogin();
+  saveSession(view);
   if (view === 'home') return renderHome();
   if (view === 'records') return renderRecords();
   if (view === 'summary') return renderSummary();
   if (view === 'admin') return renderAdmin();
   if (view === 'sync') return renderSync();
+  return renderHome();
 }
 
 function handleDisabledUser() {
+  clearTimeout(autoSyncTimer);
   currentUser = null;
-  toast('Tu usuario fue desactivado por el Administrador.', 5000);
+  pendingCount = 0;
+  clearSession();
+  toast('Tu usuario o dispositivo ya no está autorizado.', 5000);
   renderLogin();
+}
+
+function restoreSession(users) {
+  const saved = readSession();
+  if (!saved) return false;
+  const user = users.find((item) => item.id === saved.userId && item.active !== false && item.central === true);
+  if (!user) {
+    clearSession();
+    return false;
+  }
+
+  currentUser = user;
+  let view = saved.view;
+  if (view === 'admin' && currentUser.role !== 'ADMIN') view = 'home';
+  if (view === 'sync' && currentUser.role === 'ADMIN') view = 'home';
+  navigate(view);
+
+  if (navigator.onLine) {
+    setTimeout(async () => {
+      if (!currentUser || currentUser.id !== user.id) return;
+      try {
+        const result = await checkCentralAccess(currentUser);
+        currentUser = result.localUser || currentUser;
+        saveSession(currentView);
+        scheduleAutoSync('restore', 400);
+      } catch (error) {
+        if (error instanceof CentralApiError && ['USER_DISABLED','UNAUTHORIZED'].includes(error.code)) handleDisabledUser();
+      }
+    }, 0);
+  } else {
+    refreshSyncIndicator().catch(() => {});
+  }
+  return true;
 }
 
 async function start() {
@@ -625,13 +785,30 @@ async function start() {
     if (params.code) return renderActivation(params);
     const users = await db.getAll('usuarios');
     if (!users.length) return renderActivation({ code: '', endpoint: '' });
+    if (restoreSession(users)) return;
     renderLogin();
   } catch (error) {
     app.innerHTML = `<div class="login-wrap"><section class="login-card"><h1>No se pudo iniciar</h1><p>${esc(error.message)}</p></section></div>`;
   }
 }
 
-window.addEventListener('online', () => { if (currentUser) toast('Conexión recuperada.'); });
-window.addEventListener('offline', () => { if (currentUser) toast('Sin conexión. Tus registros seguirán guardándose localmente.'); });
+window.addEventListener('online', () => {
+  if (!currentUser) return;
+  toast('Conexión recuperada. Revisando pendientes…');
+  refreshSyncIndicator().catch(() => {});
+  scheduleAutoSync('online', AUTO_SYNC_DELAY_MS);
+});
+window.addEventListener('offline', () => {
+  if (!currentUser) return;
+  clearTimeout(autoSyncTimer);
+  toast('Sin conexión. Tus registros seguirán guardándose localmente.');
+  refreshSyncIndicator().catch(() => {});
+});
+window.addEventListener('pageshow', () => {
+  if (currentUser && navigator.onLine) scheduleAutoSync('pageshow', 700);
+});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && currentUser && navigator.onLine) scheduleAutoSync('visible', 700);
+});
 
 start();
