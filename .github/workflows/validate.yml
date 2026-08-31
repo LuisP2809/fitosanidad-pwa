@@ -1,0 +1,35 @@
+name: Validar Fitosanidad
+
+on:
+  push:
+    branches:
+      - main
+      - 'work/**'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Pruebas y build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar dependencias verificadas
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Ejecutar pruebas
+        run: npm test
+
+      - name: Construir aplicación web
+        run: npm run build:web
