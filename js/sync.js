@@ -2,6 +2,7 @@ import { db, markUserDisabled, updateLocalUserFromServer } from './db.js';
 
 const DEVICE_STORAGE_KEY = 'fitosanidad-device-id-v1';
 const REQUEST_TIMEOUT_MS = 15000;
+const SYNC_BATCH_SIZE = 200;
 
 export class CentralApiError extends Error {
   constructor(code, message) {
@@ -101,15 +102,27 @@ export async function checkCentralAccess(user) {
 
 export async function syncPending(user) {
   const all = await db.getAll('evaluaciones');
-  const pending = all.filter((row) => row.evaluadorId === user.id && row.syncStatus !== 'confirmed');
-  if (!pending.length) return { ok: true, confirmed: 0 };
-  const data = await centralRequest(user, 'appendEvaluations', { records: pending });
-  const confirmedIds = new Set(data.confirmedIds || []);
-  for (const row of pending) {
-    if (!confirmedIds.has(row.id)) continue;
-    await db.put('evaluaciones', { ...row, syncStatus: 'confirmed', syncedAt: new Date().toISOString() });
+  const pending = all
+    .filter((row) => row.evaluadorId === user.id && row.syncStatus !== 'confirmed')
+    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+  if (!pending.length) return { ok: true, confirmed: 0, pendingBefore: 0, remaining: 0 };
+
+  let confirmedTotal = 0;
+  const syncedAt = new Date().toISOString();
+  for (let offset = 0; offset < pending.length; offset += SYNC_BATCH_SIZE) {
+    const batch = pending.slice(offset, offset + SYNC_BATCH_SIZE);
+    const data = await centralRequest(user, 'appendEvaluations', { records: batch });
+    const confirmedIds = new Set((data.confirmedIds || []).map(String));
+    for (const row of batch) {
+      if (!confirmedIds.has(String(row.id))) continue;
+      await db.put('evaluaciones', { ...row, syncStatus: 'confirmed', syncedAt });
+      confirmedTotal += 1;
+    }
   }
-  return { ok: true, confirmed: confirmedIds.size };
+
+  const after = await db.getAll('evaluaciones');
+  const remaining = after.filter((row) => row.evaluadorId === user.id && row.syncStatus !== 'confirmed').length;
+  return { ok: true, confirmed: confirmedTotal, pendingBefore: pending.length, remaining };
 }
 
 export function listCentralUsers(user) { return centralRequest(user, 'listUsers'); }
