@@ -35,7 +35,22 @@ Las primeras 12 columnas de cada evaluación conservan la plantilla original. La
 
 ## Administrador inicial
 
-`provisionInitialAdmin()` se usa únicamente en una instalación nueva. Si el Administrador principal pierde su dispositivo/perfil de recuperación, puede ejecutar manualmente `rotateInitialAdminToken()` y volver a vincular `ADM-001` mediante el procedimiento técnico de recuperación.
+`provisionInitialAdmin()` se usa únicamente en una instalación nueva. Si solo necesitas renovar el token del Administrador principal, usa `rotateInitialAdminToken()`.
+
+### Reinicio total de accesos
+
+El archivo `ResetAccess.gs` contiene la función manual `resetAllAccessAndProvisionAdmin()` para una recuperación completa de permisos. Esta función:
+
+- Revoca todos los usuarios y tokens centrales de `USUARIOS_SYNC`.
+- Invalida todos los códigos temporales/QR pendientes.
+- Conserva intactas las evaluaciones de Bicho, Mosca y SENASA.
+- Conserva `AUDITORIA` y registra el reinicio de seguridad.
+- Crea nuevamente `ADM-001` / usuario `admin`.
+- Genera un código temporal de un solo uso para volver a activar al Administrador principal.
+
+Para usarla, crea en el mismo proyecto de Apps Script un archivo de script llamado `ResetAccess.gs`, copia allí el contenido del archivo homónimo del repositorio y ejecuta `resetAllAccessAndProvisionAdmin()` una sola vez. Revisa el registro de ejecución para obtener `activationCode`; no compartas ese código ni el perfil generado en chats o repositorios.
+
+Después abre Fitosanidad, pulsa **Activar otro dispositivo**, usa el código generado y la misma URL `/exec`, y crea un PIN nuevo para el Administrador. Los Evaluadores y Supervisores anteriores quedarán revocados y deberán crearse nuevamente desde Admin.
 
 ## Seguridad
 
