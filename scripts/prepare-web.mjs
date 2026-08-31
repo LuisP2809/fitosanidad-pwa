@@ -21,6 +21,7 @@ const files = [
   'styles-admin-devices.css',
   'manifest.webmanifest',
   'sw.js',
+  'js/performance-cache.js',
   'js/app.js',
   'js/db.js',
   'js/sync.js',
@@ -124,4 +125,5 @@ console.log(`Mapa fitosanitario: ${features.length}/${catalog.length} lotes con 
 console.log('Acceso responsive: fondo y cortes 900/760/420 copiados del patrón visual de Fenología');
 console.log('Escritorio 0.6.0: navegación lateral 244px y área de trabajo completa');
 console.log('Administrador 0.6.0: panel multidispositivo incluido');
+console.log('Rendimiento 0.6.1: caché compartida y precarga central incluidas');
 console.log(`Archivos públicos: ${files.length + 4}`);

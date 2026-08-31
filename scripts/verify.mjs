@@ -5,7 +5,7 @@ const root = process.cwd();
 const required = [
   'index.html','styles.css','styles-supervision.css','styles-mobile-fenologia.css','styles-summary-mobile.css','styles-map-labels.css','styles-login.css',
   'styles-desktop-fenologia.css','styles-admin-devices.css','manifest.webmanifest','sw.js',
-  'js/app.js','js/db.js','js/sync.js','js/qr.js','js/login-enhance.js','js/desktop-shell.js','js/admin-devices.js','js/supervision-safe.js','js/map-labels.js','js/version-ui.js',
+  'js/performance-cache.js','js/app.js','js/db.js','js/sync.js','js/qr.js','js/login-enhance.js','js/desktop-shell.js','js/admin-devices.js','js/supervision-safe.js','js/map-labels.js','js/version-ui.js',
   'assets/login-farm.svg','data/catalogo-fenologia.json','apps-script/Code.gs','apps-script/ResetAccess.gs','scripts/prepare-web.mjs','package.json'
 ];
 for (const file of required) {
@@ -14,7 +14,7 @@ for (const file of required) {
 
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const packageJson = JSON.parse(read('package.json'));
-if (packageJson.version !== '0.6.0') throw new Error('package.json no apunta a 0.6.0.');
+if (packageJson.version !== '0.6.1') throw new Error('package.json no apunta a 0.6.1.');
 
 const master = JSON.parse(read('data/catalogo-fenologia.json'));
 const catalog = [];
@@ -44,6 +44,7 @@ for (const [c,t,expected] of [[1,4,1/28],[14,1,2],[7,7,1/7]]) {
 
 const app = read('js/app.js');
 const sync = read('js/sync.js');
+const performanceCache = read('js/performance-cache.js');
 const backend = read('apps-script/Code.gs');
 const reset = read('apps-script/ResetAccess.gs');
 const sw = read('sw.js');
@@ -66,10 +67,13 @@ if (!app.includes('diasRevision: 7')) throw new Error('Días de revisión no est
 if (app.includes('Turno detectado')) throw new Error('Turno detectado volvió a aparecer en la interfaz.');
 if (!app.includes('Activar dispositivo') || !app.includes('qrSvg')) throw new Error('Falta la activación con QR.');
 
-if (!index.includes('styles-desktop-fenologia.css?v=0.6.0') || !index.includes('styles-admin-devices.css?v=0.6.0') || !index.includes('js/desktop-shell.js?v=0.6.0') || !index.includes('js/admin-devices.js?v=0.6.0')) throw new Error('index.html no carga el escritorio/Admin 0.6.0.');
-if (!sw.includes("fitosanidad-0.6.0") || !sw.includes('styles-desktop-fenologia.css') || !sw.includes('styles-admin-devices.css') || !sw.includes('js/desktop-shell.js') || !sw.includes('js/admin-devices.js')) throw new Error('La caché PWA 0.6.0 está incompleta.');
+if (!index.includes('styles-desktop-fenologia.css?v=0.6.1') || !index.includes('styles-admin-devices.css?v=0.6.1') || !index.includes('js/performance-cache.js?v=0.6.1') || !index.includes('js/desktop-shell.js?v=0.6.1') || !index.includes('js/admin-devices.js?v=0.6.1')) throw new Error('index.html no carga la interfaz/acelerador 0.6.1.');
+if (!sw.includes("fitosanidad-0.6.1") || !sw.includes('js/performance-cache.js') || !sw.includes('styles-desktop-fenologia.css') || !sw.includes('styles-admin-devices.css') || !sw.includes('js/desktop-shell.js') || !sw.includes('js/admin-devices.js')) throw new Error('La caché PWA 0.6.1 está incompleta.');
 if (!sw.includes("event.request.mode==='navigate'") && !sw.includes("event.request.mode === 'navigate'")) throw new Error('La navegación debe priorizar red para evitar interfaz antigua.');
-if (!versionUi.includes("APP_VERSION = '0.6.0'")) throw new Error('La fuente central de versión visible no es 0.6.0.');
+if (!versionUi.includes("APP_VERSION = '0.6.1'")) throw new Error('La fuente central de versión visible no es 0.6.1.');
+
+if (!performanceCache.includes("READ_ACTIONS = new Set(['snapshot', 'listUsers', 'listDevices'])") || !performanceCache.includes('MIN_SNAPSHOT_LIMIT = 5000') || !performanceCache.includes('MAX_STALE_MS') || !performanceCache.includes('warmAfterPing') || !performanceCache.includes('fitosanidadCachedFetch')) throw new Error('Falta la optimización de navegación/caché central 0.6.1.');
+if (!performanceCache.includes("body.action === 'appendEvaluations'") || !performanceCache.includes("body.action === 'setDeviceActive'")) throw new Error('La caché de rendimiento no invalida cambios centrales.');
 
 if (!desktopStyles.includes('grid-template-columns:244px minmax(0,1fr)') || !desktopStyles.includes('@media (min-width:761px)')) throw new Error('Falta el escritorio tipo Fenología con menú lateral de 244px.');
 if (!desktopShell.includes("nav.classList.add('fit-sidebar')") || !desktopShell.includes('fit-side-footer') || !desktopShell.includes('Administración')) throw new Error('Falta transformar la navegación inferior en lateral para PC.');
@@ -97,12 +101,13 @@ if (!mapLabels.includes('sup-lot-label') || !mapLabels.includes('supMapPopup') |
 const allText = required.map(read).join('\n');
 if (/AIza[0-9A-Za-z_-]{20,}|script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}/.test(allText)) throw new Error('Se detectó un secreto o URL real de implementación dentro del repositorio.');
 
-console.log('OK · Fitosanidad PWA 0.6.0');
+console.log('OK · Fitosanidad PWA 0.6.1');
 console.log(`Catálogo maestro de Fenología: ${catalog.length} lotes`);
 console.log('Fórmulas verificadas: Bicho, Mosca, SENASA');
 console.log('PC: navegación lateral 244px y área de trabajo completa verificadas');
 console.log('Móvil: navegación inferior y responsive existente verificados');
+console.log('Rendimiento: snapshot/usuarios/dispositivos precargados, deduplicados y actualizados en segundo plano');
 console.log('Administrador: varios dispositivos, QR, revocación individual y migración 0.5.x verificados');
-console.log('Backend: DISPOSITIVOS_SYNC y credenciales independientes verificadas');
+console.log('Backend: Apps Script multidispositivo 0.6.0 conservado');
 console.log('Mapa: 254 lotes, zoom, etiquetas y detalle rápido conservados');
-console.log('Versión visible y caché: 0.6.0 verificadas');
+console.log('Versión visible y caché: 0.6.1 verificadas');
