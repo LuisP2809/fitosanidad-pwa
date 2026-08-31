@@ -19,6 +19,7 @@ const files = [
   'styles-login.css',
   'styles-desktop-fenologia.css',
   'styles-admin-devices.css',
+  'styles-sync-status.css',
   'manifest.webmanifest',
   'sw.js',
   'js/performance-cache.js',
@@ -126,4 +127,5 @@ console.log('Acceso responsive: fondo y cortes 900/760/420 copiados del patrón 
 console.log('Escritorio 0.6.0: navegación lateral 244px y área de trabajo completa');
 console.log('Administrador 0.6.0: panel multidispositivo incluido');
 console.log('Rendimiento 0.6.1: caché compartida y precarga central incluidas');
+console.log('Offline 0.6.2: auto-sync, reconciliación local y sesión/panel tras recarga incluidos');
 console.log(`Archivos públicos: ${files.length + 4}`);
